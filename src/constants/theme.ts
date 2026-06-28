@@ -1,0 +1,117 @@
+/**
+ * RollBowl Kitchen — Theme Constants
+ * Defines the design system tokens for the Kitchen application.
+ */
+
+export const Colors = {
+  // Base
+  background: '#0B1020',
+  surface: '#141A2E',
+  surfaceHighlight: '#1E2540',
+  
+  // Brand
+  primary: '#D32F2F', // Primary Red
+  primaryMuted: 'rgba(211, 47, 47, 0.15)',
+  accent: '#F9A825', // Primary Yellow
+  accentMuted: 'rgba(249, 168, 37, 0.15)',
+  
+  // Status
+  success: '#2E7D32', // Success Green
+  successMuted: 'rgba(46, 125, 50, 0.15)',
+  warning: '#F57C00',
+  warningMuted: 'rgba(245, 124, 0, 0.15)',
+  error: '#D32F2F',
+  errorMuted: 'rgba(211, 47, 47, 0.15)',
+  info: '#1565C0',
+  infoMuted: 'rgba(21, 101, 192, 0.15)',
+  secondary: '#7B1FA2',
+  secondaryMuted: 'rgba(123, 31, 162, 0.15)',
+  transparent: 'transparent',
+  white: '#FFFFFF',
+  
+  // Text
+  textPrimary: '#FFFFFF',
+  textSecondary: '#A0AEC0',
+  textTertiary: '#718096',
+  textInverse: '#0B1020',
+  
+  // UI Elements
+  border: '#2D3748',
+  borderLight: '#4A5568',
+  divider: '#1A202C',
+  overlay: 'rgba(11, 16, 32, 0.7)',
+  surfaceElevated: '#1E2540',
+};
+
+export const Typography = {
+  family: {
+    regular: 'Inter_400Regular',
+    medium: 'Inter_500Medium',
+    semiBold: 'Inter_600SemiBold',
+    bold: 'Inter_700Bold',
+  },
+  size: {
+    xs: 12,
+    sm: 14,
+    base: 16,
+    lg: 18,
+    xl: 20,
+    '2xl': 24,
+    '3xl': 30,
+    '4xl': 36,
+  },
+  lineHeight: {
+    none: 1,
+    tight: 1.25,
+    base: 1.5,
+    relaxed: 1.75,
+    '2xl': 2.0,
+  },
+};
+
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  base: 16,
+  lg: 24,
+  xl: 32,
+  '2xl': 40,
+  '3xl': 48,
+  '4xl': 64,
+  '5xl': 80,
+};
+
+export const Radii = {
+  none: 0,
+  sm: 4,
+  base: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  full: 9999,
+};
+
+export const Shadows = {
+  sm: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  glowPrimary: {
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+};
