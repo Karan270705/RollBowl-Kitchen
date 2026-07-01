@@ -6,7 +6,7 @@ import { CalendarStrip } from '@/src/components/ui/CalendarStrip';
 import { MenuItemCard } from '@/src/components/menu/MenuItemCard';
 import { MealSelectionModal } from '@/src/components/menu/MealSelectionModal';
 import { Button } from '@/src/components/ui/Button';
-import { getKitchenDate, getKitchenTomorrow } from '@/src/utils/helpers';
+import { getKitchenDate, getKitchenTomorrow, isMenuLocked } from '@/src/utils/helpers';
 import {
   useMenuForDate,
   useMealsPool,
@@ -22,6 +22,8 @@ export default function MenuScreen() {
     getKitchenTomorrow().toISOString().split('T')[0]
   );
   const [modalVisible, setModalVisible] = useState(false);
+
+  const isLocked = isMenuLocked(selectedDateStr);
 
   // Queries
   const { data: menuData, isLoading: menuLoading } = useMenuForDate(selectedDateStr);
@@ -90,6 +92,13 @@ export default function MenuScreen() {
         </Text>
       </View>
 
+      {isLocked && (
+        <View style={styles.lockedBanner}>
+          <Ionicons name="lock-closed" size={16} color={Colors.warning} />
+          <Text style={styles.lockedText}>Menu Locked: Orders have already closed for this date.</Text>
+        </View>
+      )}
+
       {menuLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -101,22 +110,26 @@ export default function MenuScreen() {
               <Ionicons name="restaurant-outline" size={48} color={Colors.textTertiary} />
               <Text style={styles.emptyTitle}>No Menu Configured</Text>
               <Text style={styles.emptyDesc}>
-                Add meals to publish the menu for {formattedHeaderDate}.
+                {isLocked 
+                  ? 'Menu is locked for this date. No meals can be added.'
+                  : `Add meals to publish the menu for ${formattedHeaderDate}.`}
               </Text>
-              <View style={styles.emptyActions}>
-                <Button 
-                  title="Add Meals" 
-                  onPress={() => setModalVisible(true)} 
-                  style={styles.actionBtn}
-                />
-                <Button 
-                  title="Copy Today's Menu" 
-                  variant="outline"
-                  onPress={handleCopyFromToday}
-                  loading={copying}
-                  style={styles.actionBtn}
-                />
-              </View>
+              {!isLocked && (
+                <View style={styles.emptyActions}>
+                  <Button 
+                    title="Add Meals" 
+                    onPress={() => setModalVisible(true)} 
+                    style={styles.actionBtn}
+                  />
+                  <Button 
+                    title="Copy Today's Menu" 
+                    variant="outline"
+                    onPress={handleCopyFromToday}
+                    loading={copying}
+                    style={styles.actionBtn}
+                  />
+                </View>
+              )}
             </View>
           ) : (
             items.map((item) => (
@@ -124,13 +137,14 @@ export default function MenuScreen() {
                 key={item.id}
                 item={item}
                 onRemove={handleRemoveMeal}
+                isLocked={isLocked}
               />
             ))
           )}
         </ScrollView>
       )}
 
-      {items.length > 0 && (
+      {items.length > 0 && !isLocked && (
         <View style={styles.floatingAction}>
           <Button 
             title="Add Meals" 
@@ -244,5 +258,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  lockedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.warningMuted,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.base,
+    marginHorizontal: Spacing.base,
+    marginBottom: Spacing.base,
+    borderRadius: Radii.md,
+    gap: Spacing.xs,
+  },
+  lockedText: {
+    fontFamily: Typography.family.medium,
+    fontSize: Typography.size.sm,
+    color: Colors.warning,
+    flex: 1,
   },
 });

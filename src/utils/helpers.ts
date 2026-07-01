@@ -48,3 +48,27 @@ export function formatDisplayDate(date: Date): string {
     day: 'numeric',
   });
 }
+
+/**
+ * Checks if a menu is locked for a given date.
+ * Business Rule: Orders close at 10:00 AM.
+ * - Past dates: always locked.
+ * - Today: locked if current time >= 10:00 AM.
+ * - Future dates: editable.
+ */
+export function isMenuLocked(dateStr: string): boolean {
+  const today = getKitchenDate();
+  const todayStr = formatDateKey(today);
+  
+  if (dateStr < todayStr) {
+    return true; // Past dates are always locked
+  }
+  
+  if (dateStr === todayStr) {
+    // Today's menu is locked if it's 10 AM or later
+    return new Date().getHours() >= 10;
+  }
+  
+  return false; // Future dates are never locked
+}
+

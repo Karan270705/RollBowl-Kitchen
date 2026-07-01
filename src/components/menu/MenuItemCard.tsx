@@ -7,9 +7,10 @@ import { MenuScheduleItem } from '@/src/types/models';
 interface MenuItemCardProps {
   item: MenuScheduleItem;
   onRemove: (mealId: string) => void;
+  isLocked?: boolean;
 }
 
-export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onRemove }) => {
+export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onRemove, isLocked = false }) => {
   const { meal } = item;
 
   if (!meal) return null;
@@ -22,16 +23,18 @@ export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onRemove }) =>
           <Text style={styles.price}>₹{meal.price}</Text>
         </View>
         <Text style={styles.category}>{meal.category.toUpperCase()}</Text>
-        <View style={styles.footer}>
-          <View style={styles.spacer} />
-          <TouchableOpacity 
-            style={styles.removeBtn}
-            onPress={() => onRemove(meal.id)}
-          >
-            <Ionicons name="trash-outline" size={16} color={Colors.error} />
-            <Text style={styles.removeText}>Remove</Text>
-          </TouchableOpacity>
-        </View>
+        {!isLocked && (
+          <View style={styles.footer}>
+            <View style={styles.spacer} />
+            <TouchableOpacity 
+              style={styles.removeBtn}
+              onPress={() => onRemove(meal.id)}
+            >
+              <Ionicons name="trash-outline" size={16} color={Colors.error} />
+              <Text style={styles.removeText}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </View>
   );

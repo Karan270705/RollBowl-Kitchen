@@ -73,6 +73,8 @@ export interface OrderItem {
   unitPrice: number;
   totalPrice: number;
   specialInstructions?: string;
+  subscriptionId?: string;
+  creditsUsed?: number;
   createdAt: string;
 }
 
