@@ -1,9 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
-import { StatCard } from '@/src/components/dashboard/StatCard';
+import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
 import { useUser } from '@/src/store';
 import {
   getKitchenDate,
@@ -11,16 +10,37 @@ import {
   formatDisplayDate,
 } from '@/src/utils/helpers';
 import { useTomorrowMenuStatus } from '@/src/hooks/useMenu';
+import { useDashboardMetrics } from '@/src/services/dashboard';
+import { EmptyState } from '@/src/components/ui';
+import { useRouter } from 'expo-router';
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const user = useUser();
+  const router = useRouter();
   const today = getKitchenDate();
   const tomorrow = getKitchenTomorrow();
   
-  const { data: menuStatus, isLoading: menuLoading } = useTomorrowMenuStatus();
+  const { data: menuStatus } = useTomorrowMenuStatus();
+  const { data: metrics, isLoading, error } = useDashboardMetrics();
 
   const greeting = getGreeting();
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  if (error || !metrics) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <EmptyState icon="alert-circle-outline" title="Dashboard Error" subtitle="Failed to load live metrics." />
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -42,7 +62,7 @@ export default function DashboardScreen() {
             <Ionicons
               name="calendar-outline"
               size={14}
-              color={Colors.secondary}
+              color={Colors.brandBrown}
             />
             <Text style={styles.dateText}>{formatDisplayDate(today)}</Text>
           </View>
@@ -52,63 +72,121 @@ export default function DashboardScreen() {
       {/* Kitchen Status */}
       <View style={styles.statusBar}>
         <View style={styles.statusDot} />
-        <Text style={styles.statusText}>Kitchen Active</Text>
+        <Text style={styles.statusText}>Kitchen Active · Live Sync</Text>
       </View>
 
       {/* Section: Today */}
-      <Text style={styles.sectionTitle}>
-        Today · {formatDisplayDate(today)}
-      </Text>
+      <Text style={styles.sectionTitle}>Today's Orders</Text>
 
-      <View style={styles.cardGrid}>
-        <StatCard
-          title="Today's Orders"
-          value="—"
-          subtitle="Awaiting data"
-          icon="receipt-outline"
-          accentColor={Colors.primary}
-          accentBg={Colors.primaryMuted}
-          style={styles.gridCard}
-        />
-        <StatCard
-          title="Active Subscribers"
-          value="—"
-          subtitle="Awaiting data"
-          icon="people-outline"
-          accentColor={Colors.info}
-          accentBg={Colors.infoMuted}
-          style={styles.gridCard}
-        />
+      <View style={styles.metricsRow}>
+        <View style={styles.mainMetricCard}>
+          <Text style={styles.mainMetricValue}>{metrics.todayOrders.total}</Text>
+          <Text style={styles.mainMetricLabel}>Total Orders</Text>
+        </View>
+        <View style={styles.subMetricsCol}>
+          <View style={styles.subMetricRow}>
+            <View style={styles.statusIndicator} />
+            <Text style={styles.subMetricLabel}>Pending</Text>
+            <Text style={styles.subMetricValue}>{metrics.todayOrders.pending}</Text>
+          </View>
+          <View style={styles.subMetricRow}>
+            <View style={[styles.statusIndicator, { backgroundColor: Colors.accent }]} />
+            <Text style={styles.subMetricLabel}>Preparing</Text>
+            <Text style={styles.subMetricValue}>{metrics.todayOrders.preparing}</Text>
+          </View>
+          <View style={styles.subMetricRow}>
+            <View style={[styles.statusIndicator, { backgroundColor: Colors.success }]} />
+            <Text style={styles.subMetricLabel}>Ready</Text>
+            <Text style={styles.subMetricValue}>{metrics.todayOrders.ready}</Text>
+          </View>
+          <View style={styles.subMetricRow}>
+            <View style={[styles.statusIndicator, { backgroundColor: Colors.textSecondary }]} />
+            <Text style={styles.subMetricLabel}>Collected</Text>
+            <Text style={styles.subMetricValue}>{metrics.todayOrders.collected}</Text>
+          </View>
+        </View>
       </View>
+
+      {/* Quick Insights */}
+      <Text style={styles.sectionTitle}>Quick Insights</Text>
+      <View style={styles.insightsGrid}>
+        <View style={styles.insightCard}>
+          <Ionicons name="flame-outline" size={20} color={Colors.accent} style={styles.insightIcon} />
+          <Text style={styles.insightValue}>{metrics.insights.mostOrderedMeal || 'N/A'}</Text>
+          <Text style={styles.insightLabel}>Most Ordered</Text>
+        </View>
+        <View style={styles.insightCard}>
+          <Ionicons name="ticket-outline" size={20} color={Colors.primary} style={styles.insightIcon} />
+          <Text style={styles.insightValue}>{metrics.insights.subscriptionOrders} / {metrics.insights.cashOrders}</Text>
+          <Text style={styles.insightLabel}>Sub / Cash Orders</Text>
+        </View>
+      </View>
+      
+      {metrics.insights.pendingRequiresAttention > 0 && (
+        <View style={styles.alertCard}>
+          <Ionicons name="warning-outline" size={20} color={Colors.warning} />
+          <View style={styles.alertTextWrap}>
+            <Text style={styles.alertTitle}>Action Required</Text>
+            <Text style={styles.alertDesc}>{metrics.insights.pendingRequiresAttention} orders pending for &gt; 15 mins</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Subscriptions */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Subscriptions</Text>
+        <TouchableOpacity onPress={() => router.push('/(app)/(subscriptions)')}>
+          <Text style={styles.linkText}>View All</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity 
+        style={styles.card}
+        activeOpacity={0.7}
+        onPress={() => router.push('/(app)/(subscriptions)')}
+      >
+        <View style={styles.cardIconWrap}>
+          <Ionicons name="people-outline" size={24} color={Colors.success} />
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={styles.cardValue}>{metrics.activeSubscribers}</Text>
+          <Text style={styles.cardLabel}>Active Subscribers</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />
+      </TouchableOpacity>
 
       {/* Section: Tomorrow */}
       <Text style={styles.sectionTitle}>
         Tomorrow · {formatDisplayDate(tomorrow)}
       </Text>
 
-      <View style={styles.cardGrid}>
-        <StatCard
-          title="Tomorrow Reservations"
-          value="—"
-          subtitle="Awaiting data"
-          icon="bookmark-outline"
-          accentColor={Colors.accent}
-          accentBg={Colors.accentMuted}
-          style={styles.gridCard}
-        />
-        <StatCard
-          title="Tomorrow Menu"
-          value={menuLoading ? '...' : menuStatus?.isConfigured ? 'Configured' : 'Not Configured'}
-          subtitle={menuStatus?.isConfigured ? `${menuStatus.itemCount} Meals Available` : 'Requires action'}
-          icon="fast-food-outline"
-          accentColor={menuStatus?.isConfigured ? Colors.success : Colors.warning}
-          accentBg={menuStatus?.isConfigured ? Colors.successMuted : Colors.warningMuted}
-          style={styles.gridCard}
-        />
+      <View style={styles.card}>
+        <View style={[styles.cardIconWrap, { backgroundColor: Colors.primaryMuted }]}>
+          <Ionicons name="bookmark-outline" size={24} color={Colors.primary} />
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={styles.cardValue}>{metrics.tomorrowReservations}</Text>
+          <Text style={styles.cardLabel}>Advance Reservations</Text>
+        </View>
       </View>
 
-      {/* Bottom padding */}
-      <View style={{ height: Spacing['3xl'] }} />
+      <TouchableOpacity 
+        style={[styles.card, { marginBottom: Spacing['3xl'] }]}
+        activeOpacity={0.7}
+        onPress={() => router.push('/(app)/(menu)')}
+      >
+        <View style={[styles.cardIconWrap, { backgroundColor: menuStatus?.isConfigured ? Colors.successMuted : Colors.warningMuted }]}>
+          <Ionicons name="restaurant-outline" size={24} color={menuStatus?.isConfigured ? Colors.success : Colors.warning} />
+        </View>
+        <View style={styles.cardBody}>
+          <Text style={styles.cardValue}>{menuStatus?.isConfigured ? 'Configured' : 'Action Required'}</Text>
+          <Text style={styles.cardLabel}>
+            {menuStatus?.isConfigured ? `${menuStatus.itemCount} Meals on Menu` : 'Tomorrow\'s menu is not set'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />
+      </TouchableOpacity>
+
     </ScrollView>
   );
 }
@@ -139,12 +217,14 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontFamily: Typography.family.regular,
-    fontSize: Typography.size.base,
+    fontSize: Typography.size.sm,
     color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   userName: {
     fontFamily: Typography.family.bold,
-    fontSize: Typography.size.xl,
+    fontSize: Typography.size['2xl'],
     color: Colors.textPrimary,
     marginTop: Spacing.xs,
   },
@@ -160,24 +240,24 @@ const styles = StyleSheet.create({
     borderRadius: Radii.full,
     gap: Spacing.xs,
     borderWidth: 1,
-    borderColor: Colors.secondary,
+    borderColor: Colors.brandBrown + '40',
   },
   dateText: {
     fontFamily: Typography.family.medium,
     fontSize: Typography.size.xs,
-    color: Colors.secondary,
+    color: Colors.brandBrown,
   },
   statusBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.successMuted,
+    backgroundColor: Colors.surface,
     paddingHorizontal: Spacing.base,
     paddingVertical: Spacing.sm + 2,
     borderRadius: Radii.md,
     gap: Spacing.sm,
     marginBottom: Spacing.xl,
     borderWidth: 1,
-    borderColor: Colors.success,
+    borderColor: Colors.border,
   },
   statusDot: {
     width: 8,
@@ -188,7 +268,19 @@ const styles = StyleSheet.create({
   statusText: {
     fontFamily: Typography.family.medium,
     fontSize: Typography.size.sm,
-    color: Colors.success,
+    color: Colors.textSecondary,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
+  },
+  linkText: {
+    fontFamily: Typography.family.medium,
+    fontSize: Typography.size.sm,
+    color: Colors.accent,
   },
   sectionTitle: {
     fontFamily: Typography.family.semiBold,
@@ -199,12 +291,148 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     marginTop: Spacing.sm,
   },
-  cardGrid: {
+  metricsRow: {
     flexDirection: 'row',
     gap: Spacing.md,
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.xl,
   },
-  gridCard: {
+  mainMetricCard: {
     flex: 1,
+    backgroundColor: Colors.primary,
+    borderRadius: Radii.lg,
+    padding: Spacing.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Shadows.md,
+  },
+  mainMetricValue: {
+    fontSize: Typography.size['4xl'],
+    fontFamily: Typography.family.bold,
+    color: Colors.white,
+    marginBottom: Spacing.xs,
+  },
+  mainMetricLabel: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.medium,
+    color: Colors.white,
+    opacity: 0.9,
+  },
+  subMetricsCol: {
+    flex: 1.2,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    justifyContent: 'space-between',
+  },
+  subMetricRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  statusIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.textSecondary,
+    marginRight: Spacing.sm,
+  },
+  subMetricLabel: {
+    flex: 1,
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.medium,
+    color: Colors.textSecondary,
+  },
+  subMetricValue: {
+    fontSize: Typography.size.base,
+    fontFamily: Typography.family.bold,
+    color: Colors.textPrimary,
+  },
+  insightsGrid: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  insightCard: {
+    flex: 1,
+    backgroundColor: Colors.surfaceHighlight,
+    borderRadius: Radii.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  insightIcon: {
+    marginBottom: Spacing.sm,
+  },
+  insightValue: {
+    fontSize: Typography.size.lg,
+    fontFamily: Typography.family.bold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  insightLabel: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.medium,
+    color: Colors.textSecondary,
+  },
+  alertCard: {
+    flexDirection: 'row',
+    backgroundColor: Colors.warningMuted,
+    borderRadius: Radii.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.warning + '40',
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  alertTextWrap: {
+    marginLeft: Spacing.sm,
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.bold,
+    color: Colors.warning,
+    marginBottom: 2,
+  },
+  alertDesc: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.medium,
+    color: Colors.warning,
+    opacity: 0.9,
+  },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    padding: Spacing.md,
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.md,
+  },
+  cardIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.successMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  cardBody: {
+    flex: 1,
+  },
+  cardValue: {
+    fontSize: Typography.size.lg,
+    fontFamily: Typography.family.bold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  cardLabel: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.medium,
+    color: Colors.textSecondary,
   },
 });

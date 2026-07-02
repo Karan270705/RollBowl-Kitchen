@@ -4,43 +4,44 @@
  */
 
 export const Colors = {
-  // Base
-  background: '#0B1020',
-  surface: '#141A2E',
-  surfaceHighlight: '#1E2540',
+  // Base - Dark Onyx / Charcoal
+  background: '#0A0A0A',
+  surface: '#121212',
+  surfaceHighlight: '#1A1A1A',
   
-  // Brand
-  primary: '#D32F2F', // Primary Red
-  primaryMuted: 'rgba(211, 47, 47, 0.15)',
-  accent: '#F9A825', // Primary Yellow
-  accentMuted: 'rgba(249, 168, 37, 0.15)',
+  // Brand - Extracted from RollBowl Logo
+  primary: '#C8102E', // Brand Red
+  primaryMuted: 'rgba(200, 16, 46, 0.15)',
+  accent: '#F5A623', // Brand Orange/Yellow
+  accentMuted: 'rgba(245, 166, 35, 0.15)',
+  brandBrown: '#795548', // From circle outline
   
   // Status
-  success: '#2E7D32', // Success Green
+  success: '#2E7D32', // Brand Green (Healthy Choice)
   successMuted: 'rgba(46, 125, 50, 0.15)',
   warning: '#F57C00',
   warningMuted: 'rgba(245, 124, 0, 0.15)',
-  error: '#D32F2F',
-  errorMuted: 'rgba(211, 47, 47, 0.15)',
+  error: '#C8102E',
+  errorMuted: 'rgba(200, 16, 46, 0.15)',
   info: '#1565C0',
   infoMuted: 'rgba(21, 101, 192, 0.15)',
-  secondary: '#7B1FA2',
-  secondaryMuted: 'rgba(123, 31, 162, 0.15)',
+  secondary: '#795548', // Shifted secondary to brand brown
+  secondaryMuted: 'rgba(121, 85, 72, 0.15)',
   transparent: 'transparent',
   white: '#FFFFFF',
   
   // Text
   textPrimary: '#FFFFFF',
-  textSecondary: '#A0AEC0',
-  textTertiary: '#718096',
-  textInverse: '#0B1020',
+  textSecondary: '#A3A3A3',
+  textTertiary: '#737373',
+  textInverse: '#0A0A0A',
   
   // UI Elements
-  border: '#2D3748',
-  borderLight: '#4A5568',
-  divider: '#1A202C',
-  overlay: 'rgba(11, 16, 32, 0.7)',
-  surfaceElevated: '#1E2540',
+  border: '#262626',
+  borderLight: '#404040',
+  divider: '#171717',
+  overlay: 'rgba(10, 10, 10, 0.8)',
+  surfaceElevated: '#171717',
 };
 
 export const Typography = {

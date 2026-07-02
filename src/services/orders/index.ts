@@ -111,4 +111,43 @@ export const updateOrderStatus = async (orderId: string, status: Order['status']
   if (!data || data.length === 0) {
     throw new Error('Failed to update order status. You may not have permission.');
   }
+
+  // Trigger notification event for customer (async, don't await so we don't block UI)
+  const row = data[0];
+  notifyOrderStatusChanged(row.user_id, row.order_number, row.id, status).catch(err => {
+    console.error('Failed to notify customer:', err);
+  });
+};
+
+/**
+ * Maps the order status to an event type and calls the create_notification RPC.
+ * To avoid duplicating message content, we pass empty strings and let the 
+ * Customer App resolve the actual title/body based on the event payload.
+ */
+export const notifyOrderStatusChanged = async (
+  userId: string,
+  orderNumber: string,
+  orderId: string,
+  status: Order['status']
+) => {
+  let event = '';
+  switch (status) {
+    case 'preparing': event = 'ORDER_PREPARING'; break;
+    case 'ready': event = 'ORDER_READY'; break;
+    case 'picked_up': event = 'ORDER_COLLECTED'; break;
+    case 'cancelled': event = 'ORDER_CANCELLED'; break;
+    default: return; // No notification for other statuses (e.g., pending)
+  }
+
+  const { error } = await supabase.rpc('create_notification', {
+    p_user_id: userId,
+    p_title: '',
+    p_body: '',
+    p_type: 'order_update',
+    p_data: { event, orderId, orderNumber }
+  });
+
+  if (error) {
+    console.error('Error in notifyOrderStatusChanged:', error);
+  }
 };

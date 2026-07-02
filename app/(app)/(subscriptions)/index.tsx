@@ -1,24 +1,117 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing } from '@/src/constants/theme';
+import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
+import { useSubscribersList } from '@/src/services/subscriptions';
+import { EmptyState } from '@/src/components/ui';
+import { useRouter } from 'expo-router';
+import { formatDisplayDate } from '@/src/utils/helpers';
 
 export default function SubscriptionsScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { data: subscribers = [], isLoading, error } = useSubscribersList();
+
+  const activeCount = subscribers.filter(s => s.status === 'active').length;
+  const expiredCount = subscribers.filter(s => s.status === 'expired').length;
+  const totalCredits = subscribers
+    .filter(s => s.status === 'active')
+    .reduce((sum, s) => sum + s.remainingMeals, 0);
+
+  // Consider expiring soon if end date is within 7 days
+  const now = new Date();
+  const expiringSoonCount = subscribers.filter(s => {
+    if (s.status !== 'active') return false;
+    const endDate = new Date(s.endDate);
+    const diffDays = (endDate.getTime() - now.getTime()) / (1000 * 3600 * 24);
+    return diffDays > 0 && diffDays <= 7;
+  }).length;
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return Colors.success;
+      case 'paused': return Colors.warning;
+      case 'expired': return Colors.textTertiary;
+      case 'cancelled': return Colors.error;
+      default: return Colors.textSecondary;
+    }
+  };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + Spacing.base }]}>
-      <Text style={styles.screenTitle}>Subscriptions</Text>
-      <View style={styles.placeholder}>
-        <View style={styles.iconWrap}>
-          <Ionicons name="card-outline" size={48} color={Colors.textTertiary} />
-        </View>
-        <Text style={styles.comingSoon}>Coming Soon</Text>
-        <Text style={styles.description}>
-          View active subscribers, daily reservation counts, and manage subscription fulfillment by date.
-        </Text>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Subscribers</Text>
       </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        
+        {/* Metrics Row */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.metricsContainer}>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Active</Text>
+            <Text style={[styles.metricValue, { color: Colors.success }]}>{activeCount}</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Expiring Soon</Text>
+            <Text style={[styles.metricValue, { color: Colors.warning }]}>{expiringSoonCount}</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Expired</Text>
+            <Text style={[styles.metricValue, { color: Colors.textTertiary }]}>{expiredCount}</Text>
+          </View>
+          <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Total Outstanding</Text>
+            <Text style={[styles.metricValue, { color: Colors.primary }]}>{totalCredits} <Text style={{fontSize: 14, color: Colors.textSecondary}}>Credits</Text></Text>
+          </View>
+        </ScrollView>
+
+        <Text style={styles.sectionTitle}>All Subscribers</Text>
+
+        {isLoading ? (
+          <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
+        ) : error ? (
+          <EmptyState icon="alert-circle-outline" title="Error Loading Data" subtitle="Failed to load subscribers." />
+        ) : subscribers.length === 0 ? (
+          <EmptyState icon="people-outline" title="No Subscribers" subtitle="You don't have any subscribers yet." />
+        ) : (
+          <View style={styles.listContainer}>
+            {subscribers.map((sub) => (
+              <TouchableOpacity 
+                key={sub.id} 
+                style={styles.subscriberCard}
+                activeOpacity={0.7}
+                onPress={() => router.push(`/(app)/(subscriptions)/${sub.id}` as any)}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.customerName}>{sub.customerName}</Text>
+                    {sub.customerName === 'No Profile Name' && (
+                      <Text style={styles.userIdText}>ID: {sub.userId}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sub.status) + '15', borderColor: getStatusColor(sub.status) + '40' }]}>
+                    <Text style={[styles.statusText, { color: getStatusColor(sub.status) }]}>{sub.status.toUpperCase()}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.cardDetails}>
+                  <View style={styles.detailItem}>
+                    <Ionicons name="card-outline" size={14} color={Colors.textTertiary} />
+                    <Text style={styles.detailText}>{sub.planName}</Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Ionicons name="nutrition-outline" size={14} color={Colors.textTertiary} />
+                    <Text style={[styles.detailText, { fontFamily: Typography.family.semiBold, color: Colors.textPrimary }]}>
+                      {sub.remainingMeals} Credits Remaining
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -27,43 +120,105 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-    padding: Spacing.base,
   },
-  screenTitle: {
+  header: {
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  title: {
+    fontSize: Typography.size['2xl'],
     fontFamily: Typography.family.bold,
-    fontSize: Typography.size.xl,
     color: Colors.textPrimary,
-    marginBottom: Spacing.xl,
   },
-  placeholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: Spacing['5xl'],
+  content: {
+    paddingBottom: Spacing['3xl'],
   },
-  iconWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+  metricsContainer: {
+    padding: Spacing.base,
+    gap: Spacing.sm,
+  },
+  metricCard: {
     backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: Spacing.md,
+    borderRadius: Radii.md,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginBottom: Spacing.lg,
+    minWidth: 130,
+    justifyContent: 'space-between',
   },
-  comingSoon: {
-    fontFamily: Typography.family.semiBold,
-    fontSize: Typography.size.lg,
+  metricLabel: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.medium,
     color: Colors.textSecondary,
+    marginBottom: Spacing.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  metricValue: {
+    fontSize: Typography.size['2xl'],
+    fontFamily: Typography.family.bold,
+  },
+  sectionTitle: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.semiBold,
+    color: Colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginHorizontal: Spacing.base,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  listContainer: {
+    paddingHorizontal: Spacing.base,
+    gap: Spacing.sm,
+  },
+  subscriberCard: {
+    backgroundColor: Colors.surfaceHighlight,
+    padding: Spacing.base,
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: Spacing.sm,
   },
-  description: {
-    fontFamily: Typography.family.regular,
-    fontSize: Typography.size.sm,
+  customerName: {
+    fontSize: Typography.size.lg,
+    fontFamily: Typography.family.bold,
+    color: Colors.textPrimary,
+  },
+  userIdText: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.medium,
     color: Colors.textTertiary,
-    textAlign: 'center',
-    paddingHorizontal: Spacing['2xl'],
-    lineHeight: Typography.lineHeight.base,
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radii.full,
+    borderWidth: 1,
+  },
+  statusText: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.bold,
+  },
+  cardDetails: {
+    gap: Spacing.xs,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  detailText: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.medium,
+    color: Colors.textSecondary,
   },
 });
