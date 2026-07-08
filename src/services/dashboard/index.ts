@@ -157,6 +157,7 @@ export interface TomorrowReservationDetails {
     orderNumber: string;
     reservedMeals: string[]; // List of meal names
     quantity: number;
+    expectedPickupSlot?: string;
   }[];
 }
 
@@ -196,6 +197,7 @@ export const fetchTomorrowReservationsDetailed = async (stallId?: string): Promi
       orderNumber: order.orderNumber,
       reservedMeals,
       quantity: orderQuantity,
+      expectedPickupSlot: order.expectedPickupSlot,
     };
   });
 

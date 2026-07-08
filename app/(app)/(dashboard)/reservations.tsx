@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,41 @@ export default function TomorrowReservationsScreen() {
   const { data, isLoading, error } = useTomorrowReservationsDetailed();
 
   const tomorrow = getKitchenTomorrow();
+
+  const SLOT_ORDER = [
+    '12:00–12:30',
+    '12:30–1:00',
+    '1:00–1:30',
+    '1:30–2:00',
+    'Not Sure',
+    'Not Scheduled'
+  ];
+
+  const groupedCustomers = useMemo(() => {
+    if (!data) return [];
+    
+    const groups: Record<string, typeof data.customerBreakdown> = {};
+    
+    data.customerBreakdown.forEach(c => {
+      const slot = c.expectedPickupSlot || 'Not Scheduled';
+      if (!groups[slot]) groups[slot] = [];
+      groups[slot].push(c);
+    });
+
+    // Sort customers alphabetically within groups
+    Object.keys(groups).forEach(slot => {
+      groups[slot].sort((a, b) => a.customerName.localeCompare(b.customerName));
+    });
+
+    // Sort groups chronologically based on SLOT_ORDER
+    return Object.entries(groups).sort(([slotA], [slotB]) => {
+      const indexA = SLOT_ORDER.indexOf(slotA);
+      const indexB = SLOT_ORDER.indexOf(slotB);
+      const rankA = indexA === -1 ? 999 : indexA;
+      const rankB = indexB === -1 ? 999 : indexB;
+      return rankA - rankB;
+    });
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -99,39 +134,47 @@ export default function TomorrowReservationsScreen() {
 
         {/* Customer Breakdown */}
         <Text style={styles.sectionTitle}>Customer Breakdown</Text>
-        {data.customerBreakdown.length === 0 ? (
+        {groupedCustomers.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>No reservations for tomorrow.</Text>
           </View>
         ) : (
           <View style={styles.customersList}>
-            {data.customerBreakdown.map((customer) => (
-              <View key={customer.id} style={styles.customerCard}>
-                <View style={styles.customerHeader}>
-                  <Text style={styles.customerName}>{customer.customerName}</Text>
-                  <View style={styles.orderNumberBadge}>
-                    <Text style={styles.orderNumberText}>#{customer.orderNumber}</Text>
-                  </View>
+            {groupedCustomers.map(([slot, customers]) => (
+              <View key={slot} style={styles.slotGroup}>
+                <View style={styles.slotHeader}>
+                  <Ionicons name="time-outline" size={16} color={Colors.primary} />
+                  <Text style={styles.slotHeaderText}>{slot}</Text>
                 </View>
-                
-                <View style={styles.contactRow}>
-                  <Ionicons name="call-outline" size={14} color={Colors.textTertiary} />
-                  <Text style={styles.contactText}>{customer.phone}</Text>
-                </View>
-
-                <View style={styles.mealsList}>
-                  {customer.reservedMeals.map((meal, idx) => (
-                    <View key={idx} style={styles.mealItem}>
-                      <Ionicons name="restaurant-outline" size={14} color={Colors.primary} />
-                      <Text style={styles.mealText}>{meal}</Text>
+                {customers.map((customer) => (
+                  <View key={customer.id} style={styles.customerCard}>
+                    <View style={styles.customerHeader}>
+                      <Text style={styles.customerName}>{customer.customerName}</Text>
+                      <View style={styles.orderNumberBadge}>
+                        <Text style={styles.orderNumberText}>#{customer.orderNumber}</Text>
+                      </View>
                     </View>
-                  ))}
-                </View>
+                    
+                    <View style={styles.contactRow}>
+                      <Ionicons name="call-outline" size={14} color={Colors.textTertiary} />
+                      <Text style={styles.contactText}>{customer.phone}</Text>
+                    </View>
 
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Total Meals</Text>
-                  <Text style={styles.totalValue}>{customer.quantity}</Text>
-                </View>
+                    <View style={styles.mealsList}>
+                      {customer.reservedMeals.map((meal, idx) => (
+                        <View key={idx} style={styles.mealItem}>
+                          <Ionicons name="restaurant-outline" size={14} color={Colors.primary} />
+                          <Text style={styles.mealText}>{meal}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    <View style={styles.totalRow}>
+                      <Text style={styles.totalLabel}>Total Meals</Text>
+                      <Text style={styles.totalValue}>{customer.quantity}</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             ))}
           </View>
@@ -262,7 +305,22 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
   },
   customersList: {
+    gap: Spacing.xl,
+  },
+  slotGroup: {
     gap: Spacing.md,
+  },
+  slotHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingLeft: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  slotHeaderText: {
+    fontSize: Typography.size.base,
+    fontFamily: Typography.family.bold,
+    color: Colors.textPrimary,
   },
   customerCard: {
     backgroundColor: Colors.surfaceHighlight,

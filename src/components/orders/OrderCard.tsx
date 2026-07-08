@@ -67,6 +67,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
               <Text style={styles.subText}>SUBSCRIPTION</Text>
             </View>
           )}
+          {order.expectedPickupSlot && (
+            <View style={styles.slotBadge}>
+              <Ionicons name="time-outline" size={12} color={Colors.textSecondary} />
+              <Text style={styles.slotText}>{order.expectedPickupSlot}</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -167,6 +173,22 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.bold,
     fontSize: 10,
     color: Colors.primary,
+  },
+  slotBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.surfaceHighlight,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radii.sm,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  slotText: {
+    fontFamily: Typography.family.medium,
+    fontSize: 10,
+    color: Colors.textSecondary,
   },
   divider: {
     height: 1,

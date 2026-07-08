@@ -95,6 +95,7 @@ export interface Order {
   discount: number;
   total: number;
   notes?: string;
+  expectedPickupSlot?: string;
   pickupDate: string;
   estimatedReadyTime?: string;
   createdAt: string;
