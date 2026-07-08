@@ -15,12 +15,18 @@ export const getPrimaryStallId = async (): Promise<string> => {
   return data.id;
 };
 
-export const fetchActiveAndRecentOrders = async (stallId?: string): Promise<Order[]> => {
-  const actualStallId = stallId || await getPrimaryStallId();
+export interface FetchOrdersOptions {
+  date?: string; // e.g. formatDateKey(today)
+  includeFuture?: boolean; // if true, ignores date and fetches >= today
+  includeCancelled?: boolean;
+  statusIn?: Order['status'][];
+  stallId?: string;
+}
 
-  // Fetch orders that are not cancelled, mostly focusing on today's queue
-  // In a real app we might paginate or filter by specific pickup_date ranges.
-  const { data: ordersData, error: ordersError } = await supabase
+export const fetchOrders = async (options: FetchOrdersOptions): Promise<Order[]> => {
+  const actualStallId = options.stallId || await getPrimaryStallId();
+  
+  let query = supabase
     .from('orders')
     .select(`
       id,
@@ -40,10 +46,26 @@ export const fetchActiveAndRecentOrders = async (stallId?: string): Promise<Orde
       pickup_date,
       estimated_ready_time,
       created_at,
-      updated_at
+      updated_at,
+      users ( phone )
     `)
-    .eq('stall_id', actualStallId)
-    .neq('status', 'cancelled')
+    .eq('stall_id', actualStallId);
+
+  if (!options.includeCancelled) {
+    query = query.neq('status', 'cancelled');
+  }
+
+  if (options.statusIn && options.statusIn.length > 0) {
+    query = query.in('status', options.statusIn);
+  }
+
+  if (options.includeFuture) {
+    // For orders page: we want today AND future
+  } else if (options.date) {
+    query = query.eq('pickup_date', options.date);
+  }
+
+  const { data: ordersData, error: ordersError } = await query
     .order('pickup_date', { ascending: true })
     .order('created_at', { ascending: true });
 
@@ -81,6 +103,7 @@ export const fetchActiveAndRecentOrders = async (stallId?: string): Promise<Orde
     orderNumber: row.order_number,
     userId: row.user_id,
     customerName: row.customer_name,
+    customerPhone: row.users?.phone,
     stallId: row.stall_id,
     stallName: row.stall_name,
     status: row.status,
@@ -132,7 +155,8 @@ export const notifyOrderStatusChanged = async (
 ) => {
   let event = '';
   switch (status) {
-    case 'preparing': event = 'ORDER_PREPARING'; break;
+    case 'confirmed': event = 'ORDER_ACCEPTED'; break;
+    case 'preparing': event = 'ORDER_PREPARING'; break; // Keep for fallback legacy orders
     case 'ready': event = 'ORDER_READY'; break;
     case 'picked_up': event = 'ORDER_COLLECTED'; break;
     case 'cancelled': event = 'ORDER_CANCELLED'; break;

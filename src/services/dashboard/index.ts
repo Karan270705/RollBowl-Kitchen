@@ -3,17 +3,19 @@ import { getPrimaryStallId } from '@/src/services/menu';
 import { getKitchenDate, getKitchenTomorrow, formatDateKey } from '@/src/utils/helpers';
 import { useQuery } from '@tanstack/react-query';
 import { Order } from '@/src/types/models';
+import { fetchOrders } from '@/src/services/orders';
 
 export interface DashboardMetrics {
   todayOrders: {
     total: number;
     pending: number;
-    preparing: number;
+    accepted: number;
     ready: number;
     collected: number;
   };
   activeSubscribers: number;
   tomorrowReservations: number;
+  tomorrowTotalMeals: number;
   insights: {
     mostOrderedMeal: string | null;
     subscriptionOrders: number;
@@ -27,14 +29,12 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
   const tomorrow = getKitchenTomorrow();
   const actualStallId = stallId || await getPrimaryStallId();
 
-  // 1. Fetch Today's Orders
-  const { data: todayOrdersData, error: todayError } = await supabase
-    .from('orders')
-    .select('id, status, order_type, created_at')
-    .eq('stall_id', actualStallId)
-    .eq('pickup_date', formatDateKey(today));
-
-  if (todayError) throw todayError;
+  // 1. Fetch Today's Orders using the shared service
+  const todayOrders = await fetchOrders({
+    stallId: actualStallId,
+    date: formatDateKey(today),
+    includeCancelled: false,
+  });
 
   // 2. Fetch Active Subscriptions
   // Assuming a stall_id or just count all active for single-stall operation
@@ -46,33 +46,44 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
   if (subError) throw subError;
 
   // 3. Fetch Tomorrow's Reservations
-  const { count: tomorrowResCount, error: tomorrowError } = await supabase
-    .from('orders')
-    .select('*', { count: 'exact', head: true })
-    .eq('stall_id', actualStallId)
-    .eq('pickup_date', formatDateKey(tomorrow));
+  const tomorrowOrders = await fetchOrders({
+    stallId: actualStallId,
+    date: formatDateKey(tomorrow),
+    includeCancelled: false,
+    statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
+  });
 
-  if (tomorrowError) throw tomorrowError;
+  let tomorrowTotalMeals = 0;
+  for (const order of tomorrowOrders) {
+    if (order.items) {
+      for (const item of order.items) {
+        tomorrowTotalMeals += item.quantity;
+      }
+    }
+  }
+
+  const tomorrowResCount = tomorrowOrders.length;
 
   // 4. Calculate Metrics
-  const todayOrders = todayOrdersData || [];
-  
-  let pending = 0, preparing = 0, ready = 0, collected = 0;
+  console.log(`[Dashboard] Received ${todayOrders.length} orders for today.`);
+  console.log('[Dashboard] Array:', JSON.stringify(todayOrders.map(o => ({ id: o.id, status: o.status, pickupDate: o.pickupDate })), null, 2));
+
+  let pending = 0, accepted = 0, ready = 0, collected = 0;
   let subscriptionOrders = 0, cashOrders = 0, pendingRequiresAttention = 0;
 
   const now = new Date().getTime();
 
   for (const order of todayOrders) {
     if (order.status === 'pending') pending++;
-    else if (order.status === 'preparing') preparing++;
+    else if (order.status === 'confirmed' || order.status === 'preparing') accepted++;
     else if (order.status === 'ready') ready++;
-    else if (order.status === 'picked_up') collected++;
+    else if (order.status === 'picked_up' || order.status === 'delivered') collected++;
 
-    if (order.order_type === 'subscription') subscriptionOrders++;
+    if (order.orderType === 'subscription') subscriptionOrders++;
     else cashOrders++;
 
     if (order.status === 'pending') {
-      const orderTime = new Date(order.created_at).getTime();
+      const orderTime = new Date(order.createdAt).getTime();
       const diffMins = (now - orderTime) / (1000 * 60);
       if (diffMins > 15) {
         pendingRequiresAttention++;
@@ -108,12 +119,13 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
     todayOrders: {
       total: todayOrders.length,
       pending,
-      preparing,
+      accepted,
       ready,
       collected,
     },
     activeSubscribers: activeSubCount || 0,
     tomorrowReservations: tomorrowResCount || 0,
+    tomorrowTotalMeals: tomorrowTotalMeals,
     insights: {
       mostOrderedMeal,
       subscriptionOrders,
@@ -130,5 +142,76 @@ export const useDashboardMetrics = () => {
       return fetchDashboardMetrics();
     },
     refetchInterval: 30000, // Refresh every 30 seconds for live feel
+  });
+};
+
+export interface TomorrowReservationDetails {
+  totalReservations: number;
+  uniqueCustomers: number;
+  totalMealsReserved: number;
+  mealBreakdown: Record<string, number>;
+  customerBreakdown: {
+    id: string;
+    customerName: string;
+    phone: string;
+    orderNumber: string;
+    reservedMeals: string[]; // List of meal names
+    quantity: number;
+  }[];
+}
+
+export const fetchTomorrowReservationsDetailed = async (stallId?: string): Promise<TomorrowReservationDetails> => {
+  const tomorrow = getKitchenTomorrow();
+  const actualStallId = stallId || await getPrimaryStallId();
+
+  // Fetch all orders for tomorrow using the shared service
+  const orders = await fetchOrders({
+    stallId: actualStallId,
+    date: formatDateKey(tomorrow),
+    includeCancelled: false,
+    statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
+  });
+
+  let totalMealsReserved = 0;
+  const mealBreakdown: Record<string, number> = {};
+  const uniqueCustomerSet = new Set<string>();
+
+  const customerBreakdown = orders.map((order) => {
+    uniqueCustomerSet.add(order.customerName);
+    
+    let orderQuantity = 0;
+    const reservedMeals: string[] = [];
+
+    for (const item of (order.items || [])) {
+      orderQuantity += item.quantity;
+      totalMealsReserved += item.quantity;
+      mealBreakdown[item.mealName] = (mealBreakdown[item.mealName] || 0) + item.quantity;
+      reservedMeals.push(item.mealName);
+    }
+
+    return {
+      id: order.id,
+      customerName: order.customerName,
+      phone: order.customerPhone || 'Not Provided',
+      orderNumber: order.orderNumber,
+      reservedMeals,
+      quantity: orderQuantity,
+    };
+  });
+
+  return {
+    totalReservations: orders.length,
+    uniqueCustomers: uniqueCustomerSet.size,
+    totalMealsReserved,
+    mealBreakdown,
+    customerBreakdown,
+  };
+};
+
+export const useTomorrowReservationsDetailed = () => {
+  return useQuery({
+    queryKey: ['tomorrow_reservations_detailed', formatDateKey(getKitchenTomorrow())],
+    queryFn: () => fetchTomorrowReservationsDetailed(),
+    refetchInterval: 60000,
   });
 };

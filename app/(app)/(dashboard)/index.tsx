@@ -76,7 +76,9 @@ export default function DashboardScreen() {
       </View>
 
       {/* Section: Today */}
-      <Text style={styles.sectionTitle}>Today's Orders</Text>
+      <Text style={styles.sectionTitle}>
+        TODAY • {formatDisplayDate(today).toUpperCase()}
+      </Text>
 
       <View style={styles.metricsRow}>
         <View style={styles.mainMetricCard}>
@@ -90,9 +92,9 @@ export default function DashboardScreen() {
             <Text style={styles.subMetricValue}>{metrics.todayOrders.pending}</Text>
           </View>
           <View style={styles.subMetricRow}>
-            <View style={[styles.statusIndicator, { backgroundColor: Colors.accent }]} />
-            <Text style={styles.subMetricLabel}>Preparing</Text>
-            <Text style={styles.subMetricValue}>{metrics.todayOrders.preparing}</Text>
+            <View style={[styles.statusIndicator, { backgroundColor: Colors.info }]} />
+            <Text style={styles.subMetricLabel}>Accepted</Text>
+            <Text style={styles.subMetricValue}>{metrics.todayOrders.accepted}</Text>
           </View>
           <View style={styles.subMetricRow}>
             <View style={[styles.statusIndicator, { backgroundColor: Colors.success }]} />
@@ -157,18 +159,30 @@ export default function DashboardScreen() {
 
       {/* Section: Tomorrow */}
       <Text style={styles.sectionTitle}>
-        Tomorrow · {formatDisplayDate(tomorrow)}
+        TOMORROW • {formatDisplayDate(tomorrow).toUpperCase()}
       </Text>
 
-      <View style={styles.card}>
+      <TouchableOpacity 
+        style={styles.card}
+        activeOpacity={0.7}
+        onPress={() => router.push('/(app)/(dashboard)/reservations' as any)}
+      >
         <View style={[styles.cardIconWrap, { backgroundColor: Colors.primaryMuted }]}>
           <Ionicons name="bookmark-outline" size={24} color={Colors.primary} />
         </View>
-        <View style={styles.cardBody}>
-          <Text style={styles.cardValue}>{metrics.tomorrowReservations}</Text>
-          <Text style={styles.cardLabel}>Advance Reservations</Text>
+        <View style={[styles.cardBody, { flexDirection: 'row', alignItems: 'center' }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardLabel}>Reservations</Text>
+            <Text style={styles.cardValue}>{metrics.tomorrowReservations}</Text>
+          </View>
+          <View style={{ width: 1, height: '80%', backgroundColor: Colors.borderLight, marginHorizontal: Spacing.md }} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardLabel}>Meals</Text>
+            <Text style={styles.cardValue}>{metrics.tomorrowTotalMeals}</Text>
+          </View>
         </View>
-      </View>
+        <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />
+      </TouchableOpacity>
 
       <TouchableOpacity 
         style={[styles.card, { marginBottom: Spacing['3xl'] }]}

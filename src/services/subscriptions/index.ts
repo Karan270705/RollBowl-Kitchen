@@ -10,6 +10,8 @@ export interface SubscriberListItem {
   remainingMeals: number;
   startDate: string;
   endDate: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface SubscriberDetails extends SubscriberListItem {
@@ -36,7 +38,9 @@ export const fetchSubscribersList = async (): Promise<SubscriberListItem[]> => {
       start_date,
       end_date,
       users (
-        name
+        name,
+        email,
+        phone
       )
     `)
     .order('created_at', { ascending: false });
@@ -54,6 +58,8 @@ export const fetchSubscribersList = async (): Promise<SubscriberListItem[]> => {
       remainingMeals: sub.remaining_meals,
       startDate: sub.start_date,
       endDate: sub.end_date,
+      email: sub.users?.email,
+      phone: sub.users?.phone,
     };
   });
 };
@@ -65,7 +71,9 @@ export const fetchSubscriberDetails = async (subscriptionId: string): Promise<Su
     .select(`
       *,
       users (
-        name
+        name,
+        email,
+        phone
       )
     `)
     .eq('id', subscriptionId)
@@ -102,6 +110,8 @@ export const fetchSubscriberDetails = async (subscriptionId: string): Promise<Su
     remainingMeals: subData.remaining_meals,
     startDate: subData.start_date,
     endDate: subData.end_date,
+    email: subData.users?.email,
+    phone: subData.users?.phone,
     totalMeals: subData.total_meals,
     consumedMeals: subData.consumed_meals,
     mealsPerDay: subData.meals_per_day,

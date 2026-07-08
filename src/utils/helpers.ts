@@ -72,3 +72,21 @@ export function isMenuLocked(dateStr: string): boolean {
   return false; // Future dates are never locked
 }
 
+/**
+ * Checks if a subscription is expiring soon (within 3 days).
+ */
+export function isExpiringSoon(endDateStr: string): boolean {
+  if (!endDateStr) return false;
+  
+  const today = getKitchenDate();
+  today.setHours(0, 0, 0, 0); // Normalize to start of day
+  
+  const end = new Date(endDateStr);
+  end.setHours(0, 0, 0, 0);
+  
+  const diffTime = end.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return diffDays >= 0 && diffDays <= 3;
+}
+

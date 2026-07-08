@@ -83,6 +83,7 @@ export interface Order {
   orderNumber: string;
   userId: string;
   customerName: string;
+  customerPhone?: string;
   stallId: string;
   stallName: string;
   items?: OrderItem[];

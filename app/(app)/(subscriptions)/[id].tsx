@@ -73,13 +73,25 @@ export default function SubscriberDetailsScreen() {
           {sub.customerName === 'No Profile Name' && (
             <Text style={styles.userIdText}>ID: {sub.userId}</Text>
           )}
+
+          <View style={styles.contactInfo}>
+            <View style={styles.contactRow}>
+              <Ionicons name="mail-outline" size={16} color={Colors.textTertiary} />
+              <Text style={styles.contactText}>{sub.email || 'Not Provided'}</Text>
+            </View>
+            <View style={styles.contactRow}>
+              <Ionicons name="call-outline" size={16} color={Colors.textTertiary} />
+              <Text style={styles.contactText}>{sub.phone || 'Not Provided'}</Text>
+            </View>
+          </View>
+
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sub.status) + '15', borderColor: getStatusColor(sub.status) + '40' }]}>
             <Text style={[styles.statusText, { color: getStatusColor(sub.status) }]}>{sub.status.toUpperCase()}</Text>
           </View>
         </View>
 
         {/* Plan Details Card */}
-        <Text style={styles.sectionTitle}>Plan Information</Text>
+        <Text style={styles.sectionTitle}>Plan Details</Text>
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.col}>
@@ -213,6 +225,21 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.medium,
     color: Colors.textTertiary,
     marginBottom: Spacing.sm,
+  },
+  contactInfo: {
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: Spacing.md,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  contactText: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.medium,
+    color: Colors.textSecondary,
   },
   statusBadge: {
     paddingHorizontal: Spacing.md,

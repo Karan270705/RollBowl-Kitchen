@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchActiveAndRecentOrders, updateOrderStatus } from '../services/orders';
+import { fetchOrders, updateOrderStatus } from '../services/orders';
 import { Order } from '../types/models';
 
 export const ORDER_KEYS = {
@@ -10,7 +10,7 @@ export const ORDER_KEYS = {
 export const useOrders = (stallId?: string) => {
   return useQuery({
     queryKey: ORDER_KEYS.list(stallId),
-    queryFn: () => fetchActiveAndRecentOrders(stallId),
+    queryFn: () => fetchOrders({ stallId, includeFuture: true, includeCancelled: false }),
     refetchInterval: 15000, // Poll every 15 seconds for new orders
   });
 };

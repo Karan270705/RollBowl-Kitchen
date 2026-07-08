@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
 import { useSubscribersList } from '@/src/services/subscriptions';
-import { EmptyState } from '@/src/components/ui';
+import { EmptyState, Input } from '@/src/components/ui';
 import { useRouter } from 'expo-router';
-import { formatDisplayDate } from '@/src/utils/helpers';
+import { formatDisplayDate, isExpiringSoon } from '@/src/utils/helpers';
 
 export default function SubscriptionsScreen() {
   const insets = useSafeAreaInsets();
@@ -19,14 +19,45 @@ export default function SubscriptionsScreen() {
     .filter(s => s.status === 'active')
     .reduce((sum, s) => sum + s.remainingMeals, 0);
 
-  // Consider expiring soon if end date is within 7 days
-  const now = new Date();
-  const expiringSoonCount = subscribers.filter(s => {
-    if (s.status !== 'active') return false;
-    const endDate = new Date(s.endDate);
-    const diffDays = (endDate.getTime() - now.getTime()) / (1000 * 3600 * 24);
-    return diffDays > 0 && diffDays <= 7;
-  }).length;
+  const expiringSoonCount = subscribers.filter(s => isExpiringSoon(s.endDate) && s.status === 'active').length;
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('All');
+  const [sortBy, setSortBy] = useState<'expiry' | 'credits' | 'name'>('expiry');
+
+  const filteredAndSortedSubscribers = useMemo(() => {
+    let result = [...subscribers];
+
+    // Filter by Search
+    if (searchQuery.trim()) {
+      const lowerQ = searchQuery.toLowerCase();
+      result = result.filter(s => 
+        s.customerName.toLowerCase().includes(lowerQ) ||
+        (s.email && s.email.toLowerCase().includes(lowerQ)) ||
+        (s.phone && s.phone.toLowerCase().includes(lowerQ))
+      );
+    }
+
+    // Filter by Tab
+    if (activeTab === 'Expiring Soon') {
+      result = result.filter(s => isExpiringSoon(s.endDate) && s.status === 'active');
+    } else if (activeTab !== 'All') {
+      result = result.filter(s => s.status === activeTab.toLowerCase());
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      if (sortBy === 'expiry') {
+        return new Date(a.endDate).getTime() - new Date(b.endDate).getTime();
+      } else if (sortBy === 'credits') {
+        return a.remainingMeals - b.remainingMeals;
+      } else {
+        return a.customerName.localeCompare(b.customerName);
+      }
+    });
+
+    return result;
+  }, [subscribers, searchQuery, activeTab, sortBy]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -66,17 +97,54 @@ export default function SubscriptionsScreen() {
           </View>
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>All Subscribers</Text>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Input 
+            placeholder="Search by name, email, or phone..." 
+            value={searchQuery} 
+            onChangeText={setSearchQuery} 
+            leftIcon="search-outline" 
+          />
+        </View>
+
+        {/* Filters and Sorting */}
+        <View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsContainer}>
+            {['All', 'Active', 'Expiring Soon', 'Paused', 'Expired', 'Cancelled'].map(tab => (
+              <TouchableOpacity 
+                key={tab} 
+                style={[styles.tabChip, activeTab === tab && styles.tabChipActive]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <View style={styles.sortContainer}>
+            <Text style={styles.sortLabel}>Sort by:</Text>
+            {['expiry', 'credits', 'name'].map((sortKey) => (
+              <TouchableOpacity key={sortKey} onPress={() => setSortBy(sortKey as any)}>
+                <Text style={[styles.sortOption, sortBy === sortKey && styles.sortOptionActive]}>
+                  {sortKey.charAt(0).toUpperCase() + sortKey.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.listHeader}>
+          <Text style={styles.sectionTitle}>{activeTab} Subscribers ({filteredAndSortedSubscribers.length})</Text>
+        </View>
 
         {isLoading ? (
           <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
         ) : error ? (
           <EmptyState icon="alert-circle-outline" title="Error Loading Data" subtitle="Failed to load subscribers." />
-        ) : subscribers.length === 0 ? (
-          <EmptyState icon="people-outline" title="No Subscribers" subtitle="You don't have any subscribers yet." />
+        ) : filteredAndSortedSubscribers.length === 0 ? (
+          <EmptyState icon="people-outline" title="No Subscribers Found" subtitle="Try adjusting your search or filters." />
         ) : (
           <View style={styles.listContainer}>
-            {subscribers.map((sub) => (
+            {filteredAndSortedSubscribers.map((sub) => (
               <TouchableOpacity 
                 key={sub.id} 
                 style={styles.subscriberCard}
@@ -95,19 +163,34 @@ export default function SubscriptionsScreen() {
                   </View>
                 </View>
 
-                <View style={styles.cardDetails}>
-                  <View style={styles.detailItem}>
-                    <Ionicons name="card-outline" size={14} color={Colors.textTertiary} />
-                    <Text style={styles.detailText}>{sub.planName}</Text>
+                  <View style={styles.contactInfo}>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="mail-outline" size={14} color={Colors.textTertiary} />
+                      <Text style={styles.detailText}>{sub.email || 'Not Provided'}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="call-outline" size={14} color={Colors.textTertiary} />
+                      <Text style={styles.detailText}>{sub.phone || 'Not Provided'}</Text>
+                    </View>
                   </View>
-                  <View style={styles.detailItem}>
-                    <Ionicons name="nutrition-outline" size={14} color={Colors.textTertiary} />
-                    <Text style={[styles.detailText, { fontFamily: Typography.family.semiBold, color: Colors.textPrimary }]}>
-                      {sub.remainingMeals} Credits Remaining
-                    </Text>
+
+                  <View style={styles.cardDetails}>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="card-outline" size={14} color={Colors.textTertiary} />
+                      <Text style={styles.detailText}>{sub.planName}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="calendar-outline" size={14} color={Colors.textTertiary} />
+                      <Text style={styles.detailText}>Expires: {formatDisplayDate(new Date(sub.endDate))}</Text>
+                    </View>
+                    <View style={styles.detailItem}>
+                      <Ionicons name="nutrition-outline" size={14} color={Colors.textTertiary} />
+                      <Text style={[styles.detailText, { fontFamily: Typography.family.semiBold, color: Colors.textPrimary }]}>
+                        {sub.remainingMeals} Credits Remaining
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
             ))}
           </View>
         )}
@@ -187,6 +270,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.sm,
   },
+  searchContainer: {
+    paddingHorizontal: Spacing.base,
+    marginBottom: Spacing.sm,
+  },
+  tabsContainer: {
+    paddingHorizontal: Spacing.base,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  tabChip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radii.full,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+  },
+  tabChipActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  tabText: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.medium,
+    color: Colors.textSecondary,
+  },
+  tabTextActive: {
+    color: '#FFF',
+    fontFamily: Typography.family.bold,
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.base,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  sortLabel: {
+    fontSize: Typography.size.xs,
+    color: Colors.textTertiary,
+  },
+  sortOption: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.medium,
+    color: Colors.textSecondary,
+    paddingHorizontal: Spacing.xs,
+  },
+  sortOptionActive: {
+    color: Colors.primary,
+    fontFamily: Typography.family.bold,
+  },
+  listHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+  },
   customerName: {
     fontSize: Typography.size.lg,
     fontFamily: Typography.family.bold,
@@ -207,6 +347,13 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: Typography.size.xs,
     fontFamily: Typography.family.bold,
+  },
+  contactInfo: {
+    marginBottom: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+    gap: 4,
   },
   cardDetails: {
     gap: Spacing.xs,

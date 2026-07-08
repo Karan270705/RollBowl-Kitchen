@@ -12,13 +12,13 @@ interface OrderCardProps {
 export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
   const { mutate: updateStatus, isPending } = useUpdateOrderStatus();
 
-  // Status flow: pending → preparing → ready → picked_up
+  // Status flow: pending → confirmed (Accepted) → ready → picked_up
   const getNextAction = () => {
     switch (order.status) {
       case 'pending':
-      case 'confirmed': // In case it's confirmed but not preparing yet
-        return { label: 'Start Preparing', nextStatus: 'preparing' as const, color: Colors.info };
-      case 'preparing':
+        return { label: 'Accept Order', nextStatus: 'confirmed' as const, color: Colors.info };
+      case 'confirmed':
+      case 'preparing': // Fallback for any legacy orders
         return { label: 'Mark Ready', nextStatus: 'ready' as const, color: Colors.warning };
       case 'ready':
         return { label: 'Mark Collected', nextStatus: 'picked_up' as const, color: Colors.success };
@@ -37,8 +37,8 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending':
-      case 'confirmed': return Colors.textTertiary;
+      case 'pending': return Colors.textTertiary;
+      case 'confirmed':
       case 'preparing': return Colors.info;
       case 'ready': return Colors.warning;
       case 'picked_up':
@@ -55,7 +55,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
           <Text style={styles.customerName}>{order.customerName}</Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
             <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>
-              {order.status.replace('_', ' ').toUpperCase()}
+              {order.status === 'confirmed' ? 'ACCEPTED' : order.status.replace('_', ' ').toUpperCase()}
             </Text>
           </View>
         </View>
