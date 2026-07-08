@@ -177,7 +177,7 @@ export default function DashboardScreen() {
           </View>
           <View style={{ width: 1, height: '80%', backgroundColor: Colors.borderLight, marginHorizontal: Spacing.md }} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardLabel}>Meals</Text>
+            <Text style={styles.cardLabel}>Items</Text>
             <Text style={styles.cardValue}>{metrics.tomorrowTotalMeals}</Text>
           </View>
         </View>
@@ -195,7 +195,7 @@ export default function DashboardScreen() {
         <View style={styles.cardBody}>
           <Text style={styles.cardValue}>{menuStatus?.isConfigured ? 'Configured' : 'Action Required'}</Text>
           <Text style={styles.cardLabel}>
-            {menuStatus?.isConfigured ? `${menuStatus.itemCount} Meals on Menu` : 'Tomorrow\'s menu is not set'}
+            {menuStatus?.isConfigured ? `${menuStatus.itemCount} Items on Menu` : 'Tomorrow\'s menu is not set'}
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />

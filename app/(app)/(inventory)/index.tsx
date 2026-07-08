@@ -16,7 +16,7 @@ export default function InventoryScreen() {
         </View>
         <Text style={styles.comingSoon}>Coming Soon</Text>
         <Text style={styles.description}>
-          Track daily ingredient stock, set quantities, and monitor availability across meal items.
+          Track daily ingredient stock, set quantities, and monitor availability across menu items.
         </Text>
       </View>
     </View>

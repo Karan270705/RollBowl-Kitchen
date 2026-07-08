@@ -102,7 +102,7 @@ export default function TomorrowReservationsScreen() {
             <View style={styles.summaryDivider} />
             <View style={styles.summaryCol}>
               <Text style={styles.summaryValue}>{data.totalMealsReserved}</Text>
-              <Text style={styles.summaryLabel}>Total Meals</Text>
+              <Text style={styles.summaryLabel}>Total Items</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryCol}>
@@ -112,11 +112,11 @@ export default function TomorrowReservationsScreen() {
           </View>
         </View>
 
-        {/* Meal Breakdown */}
-        <Text style={styles.sectionTitle}>Preparation Breakdown</Text>
+        {/* Item Breakdown */}
+        <Text style={styles.sectionTitle}>Item Breakdown</Text>
         {Object.keys(data.mealBreakdown).length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No meals to prepare yet.</Text>
+            <Text style={styles.emptyText}>No items to prepare yet.</Text>
           </View>
         ) : (
           <View style={styles.breakdownCard}>
@@ -170,7 +170,7 @@ export default function TomorrowReservationsScreen() {
                     </View>
 
                     <View style={styles.totalRow}>
-                      <Text style={styles.totalLabel}>Total Meals</Text>
+                      <Text style={styles.totalLabel}>Total Items</Text>
                       <Text style={styles.totalValue}>{customer.quantity}</Text>
                     </View>
                   </View>

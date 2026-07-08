@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { Order, OrderItem } from '@/src/types/models';
-import { useUpdateOrderStatus } from '@/src/hooks/useOrders';
+import { useUpdateOrderStatus, useUpdateOrderPaymentStatus } from '@/src/hooks/useOrders';
 
 interface OrderCardProps {
   order: Order;
@@ -11,6 +11,7 @@ interface OrderCardProps {
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
   const { mutate: updateStatus, isPending } = useUpdateOrderStatus();
+  const { mutate: updatePaymentStatus, isPending: isPaymentPending } = useUpdateOrderPaymentStatus();
 
   // Status flow: pending → confirmed (Accepted) → ready → picked_up
   const getNextAction = () => {
@@ -73,6 +74,15 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
               <Text style={styles.slotText}>{order.expectedPickupSlot}</Text>
             </View>
           )}
+          {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' ? (
+            <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
+              <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>💵 CASH</Text>
+            </View>
+          ) : (order.paymentMethod === 'upi' || order.paymentMethod === 'card' || order.paymentStatus === 'paid') ? (
+            <View style={[styles.slotBadge, { backgroundColor: Colors.success + '20', borderColor: Colors.success }]}>
+              <Text style={[styles.slotText, { color: Colors.success, fontFamily: Typography.family.bold }]}>✅ Paid</Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -99,19 +109,35 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
         </View>
       )}
 
-      {action && (
+      {(action || (order.paymentMethod === 'cash' && order.paymentStatus === 'pending')) && (
         <View style={styles.actionContainer}>
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: action.color }]}
-            onPress={handleAction}
-            disabled={isPending}
-          >
-            {isPending ? (
-              <ActivityIndicator color={Colors.background} size="small" />
-            ) : (
-              <Text style={styles.actionText}>{action.label}</Text>
-            )}
-          </TouchableOpacity>
+          {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' && (
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: Colors.success, marginBottom: action ? Spacing.sm : 0 }]}
+              onPress={() => updatePaymentStatus({ orderId: order.id, status: 'paid' })}
+              disabled={isPaymentPending}
+            >
+              {isPaymentPending ? (
+                <ActivityIndicator color={Colors.background} size="small" />
+              ) : (
+                <Text style={styles.actionText}>Mark as Paid</Text>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {action && (
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: action.color }]}
+              onPress={handleAction}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <ActivityIndicator color={Colors.background} size="small" />
+              ) : (
+                <Text style={styles.actionText}>{action.label}</Text>
+              )}
+            </TouchableOpacity>
+          )}
         </View>
       )}
     </View>

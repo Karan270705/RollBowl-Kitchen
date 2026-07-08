@@ -38,6 +38,7 @@ export const fetchOrders = async (options: FetchOrdersOptions): Promise<Order[]>
       status,
       order_type,
       payment_status,
+      payment_method,
       subtotal,
       tax,
       discount,
@@ -110,6 +111,7 @@ export const fetchOrders = async (options: FetchOrdersOptions): Promise<Order[]>
     status: row.status,
     orderType: row.order_type,
     paymentStatus: row.payment_status,
+    paymentMethod: row.payment_method,
     subtotal: Number(row.subtotal),
     tax: Number(row.tax),
     discount: Number(row.discount),
@@ -142,6 +144,18 @@ export const updateOrderStatus = async (orderId: string, status: Order['status']
   notifyOrderStatusChanged(row.user_id, row.order_number, row.id, status).catch(err => {
     console.error('Failed to notify customer:', err);
   });
+};
+
+export const updateOrderPaymentStatus = async (orderId: string, status: Order['paymentStatus']): Promise<void> => {
+  const { error } = await supabase
+    .from('orders')
+    .update({ payment_status: status })
+    .eq('id', orderId);
+
+  if (error) {
+    console.error('Error updating payment status:', error);
+    throw error;
+  }
 };
 
 /**

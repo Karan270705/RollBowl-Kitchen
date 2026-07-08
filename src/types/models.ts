@@ -90,6 +90,7 @@ export interface Order {
   status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'picked_up' | 'delivered' | 'cancelled';
   orderType: 'pre_order' | 'on_stall' | 'subscription';
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  paymentMethod: 'upi' | 'card' | 'cash';
   subtotal: number;
   tax: number;
   discount: number;

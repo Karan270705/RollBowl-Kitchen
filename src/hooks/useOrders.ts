@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchOrders, updateOrderStatus } from '../services/orders';
+import { fetchOrders, updateOrderStatus, updateOrderPaymentStatus } from '../services/orders';
 import { Order } from '../types/models';
 
 export const ORDER_KEYS = {
@@ -32,6 +32,39 @@ export const useUpdateOrderStatus = () => {
         if (!oldData) return [];
         return oldData.map(order => 
           order.id === orderId ? { ...order, status } : order
+        );
+      });
+
+      return { previousOrders };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousOrders) {
+        context.previousOrders.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ORDER_KEYS.all });
+    },
+  });
+};
+
+export const useUpdateOrderPaymentStatus = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ orderId, status }: { orderId: string; status: Order['paymentStatus'] }) => 
+      updateOrderPaymentStatus(orderId, status),
+    onMutate: async ({ orderId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ORDER_KEYS.all });
+
+      const previousOrders = queryClient.getQueriesData<Order[]>({ queryKey: ORDER_KEYS.all });
+
+      queryClient.setQueriesData<Order[]>({ queryKey: ORDER_KEYS.all }, (oldData) => {
+        if (!oldData) return [];
+        return oldData.map(order => 
+          order.id === orderId ? { ...order, paymentStatus: status } : order
         );
       });
 

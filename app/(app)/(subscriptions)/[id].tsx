@@ -100,7 +100,7 @@ export default function SubscriberDetailsScreen() {
             </View>
             <View style={styles.colRight}>
               <Text style={styles.label}>Daily Limit</Text>
-              <Text style={styles.value}>{sub.mealsPerDay} meals/day</Text>
+              <Text style={styles.value}>{sub.mealsPerDay} items/day</Text>
             </View>
           </View>
           <View style={styles.divider} />
@@ -137,7 +137,7 @@ export default function SubscriberDetailsScreen() {
         <Text style={styles.sectionTitle}>Recent Usage History</Text>
         {sub.usageHistory.length === 0 ? (
           <View style={styles.emptyHistory}>
-            <Text style={styles.emptyHistoryText}>No meals consumed yet.</Text>
+            <Text style={styles.emptyHistoryText}>No items consumed yet.</Text>
           </View>
         ) : (
           <View style={styles.card}>

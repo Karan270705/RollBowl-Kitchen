@@ -50,7 +50,7 @@ export const MealSelectionModal: React.FC<MealSelectionModalProps> = ({
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
             <Ionicons name="close" size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Add Meals</Text>
+          <Text style={styles.headerTitle}>Add Items</Text>
           <TouchableOpacity onPress={handleSave} style={styles.saveBtn}>
             <Text style={styles.saveText}>Save</Text>
           </TouchableOpacity>
@@ -78,13 +78,13 @@ export const MealSelectionModal: React.FC<MealSelectionModalProps> = ({
           })}
           {availableMeals.length === 0 && (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No meals found in catalog.</Text>
+              <Text style={styles.emptyText}>No items found in catalog.</Text>
             </View>
           )}
         </ScrollView>
         <View style={styles.footer}>
           <Button 
-            title={`Add ${selectedIds.size} Meal${selectedIds.size !== 1 ? 's' : ''}`}
+            title={`Add ${selectedIds.size} Item${selectedIds.size !== 1 ? 's' : ''}`}
             onPress={handleSave} 
             fullWidth 
           />

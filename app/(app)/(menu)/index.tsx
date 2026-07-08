@@ -44,8 +44,10 @@ export default function MenuScreen() {
   };
 
   const handleRemoveMeal = (mealId: string) => {
-    if (schedule) {
-      Alert.alert('Remove Meal', 'Are you sure you want to remove this meal from the menu?', [
+    if (!schedule?.id) return;
+    
+    if (schedule.isPublished) {
+      Alert.alert('Remove Item', 'Are you sure you want to remove this item from the menu?', [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove',
@@ -53,6 +55,8 @@ export default function MenuScreen() {
           onPress: () => removeMeal({ scheduleId: schedule.id, mealId }),
         },
       ]);
+    } else {
+      removeMeal({ scheduleId: schedule.id, mealId });
     }
   };
 
@@ -111,13 +115,13 @@ export default function MenuScreen() {
               <Text style={styles.emptyTitle}>No Menu Configured</Text>
               <Text style={styles.emptyDesc}>
                 {isLocked 
-                  ? 'Menu is locked for this date. No meals can be added.'
-                  : `Add meals to publish the menu for ${formattedHeaderDate}.`}
+                  ? 'Menu is locked for this date. No items can be added.'
+                  : `Add items to publish the menu for ${formattedHeaderDate}.`}
               </Text>
               {!isLocked && (
                 <View style={styles.emptyActions}>
                   <Button 
-                    title="Add Meals" 
+                    title="Add Items" 
                     onPress={() => setModalVisible(true)} 
                     style={styles.actionBtn}
                   />
@@ -147,7 +151,7 @@ export default function MenuScreen() {
       {items.length > 0 && !isLocked && (
         <View style={styles.floatingAction}>
           <Button 
-            title="Add Meals" 
+            title="Add Items" 
             onPress={() => setModalVisible(true)} 
             fullWidth
             style={styles.fab}
