@@ -39,6 +39,18 @@ export interface Meal {
   tags: string[];
 }
 
+export interface KitchenHoliday {
+  id: string;
+  stallId: string;
+  holidayDate: string; // YYYY-MM-DD
+  title: string;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+}
+
 // ─── Menu Schedules ──────────────────────────────────────────
 
 export interface MenuSchedule {
@@ -74,7 +86,6 @@ export interface OrderItem {
   totalPrice: number;
   specialInstructions?: string;
   subscriptionId?: string;
-  creditsUsed?: number;
   createdAt: string;
 }
 

@@ -18,6 +18,7 @@ export interface SubscriberDetails extends SubscriberListItem {
   totalMeals: number;
   consumedMeals: number;
   mealsPerDay: number;
+  extendedDays: number;
   usageHistory: {
     id: string;
     mealName: string;
@@ -115,6 +116,7 @@ export const fetchSubscriberDetails = async (subscriptionId: string): Promise<Su
     totalMeals: subData.total_meals,
     consumedMeals: subData.consumed_meals,
     mealsPerDay: subData.meals_per_day,
+    extendedDays: subData.extended_days,
     usageHistory: (historyData || []).map((item: any) => ({
       id: item.id,
       mealName: item.meal_name,

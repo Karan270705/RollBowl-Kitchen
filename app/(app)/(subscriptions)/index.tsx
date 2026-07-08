@@ -100,10 +100,10 @@ export default function SubscriptionsScreen() {
         {/* Search Bar */}
         <View style={styles.searchContainer}>
           <Input 
+            label="Search"
             placeholder="Search by name, email, or phone..." 
             value={searchQuery} 
             onChangeText={setSearchQuery} 
-            leftIcon="search-outline" 
           />
         </View>
 

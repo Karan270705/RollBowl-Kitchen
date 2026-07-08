@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -76,6 +76,20 @@ export default function MoreScreen() {
           <Text style={styles.infoLabel}>Version</Text>
           <Text style={styles.infoValue}>{AppConfig.APP_VERSION}</Text>
         </View>
+      </Card>
+
+      {/* Admin Features */}
+      <Card style={styles.infoCard}>
+        <TouchableOpacity 
+          style={styles.infoRow}
+          onPress={() => router.push('/(app)/(more)/holidays')}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <Ionicons name="calendar-outline" size={20} color={Colors.textPrimary} />
+            <Text style={styles.infoLabel}>Manage Holidays</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />
+        </TouchableOpacity>
       </Card>
 
       {/* Sign Out */}

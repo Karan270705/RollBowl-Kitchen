@@ -2,8 +2,9 @@ import { supabase } from '@/src/lib/supabase';
 import { getPrimaryStallId } from '@/src/services/menu';
 import { getKitchenDate, getKitchenTomorrow, formatDateKey } from '@/src/utils/helpers';
 import { useQuery } from '@tanstack/react-query';
-import { Order } from '@/src/types/models';
+import { Order, KitchenHoliday } from '@/src/types/models';
 import { fetchOrders } from '@/src/services/orders';
+import { getHolidayForDate } from '@/src/services/holidays';
 
 export interface DashboardMetrics {
   todayOrders: {
@@ -22,6 +23,7 @@ export interface DashboardMetrics {
     cashOrders: number;
     pendingRequiresAttention: number; // Pending for > 15 mins
   };
+  holidayToday: KitchenHoliday | null;
 }
 
 export const fetchDashboardMetrics = async (stallId?: string): Promise<DashboardMetrics> => {
@@ -29,12 +31,15 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
   const tomorrow = getKitchenTomorrow();
   const actualStallId = stallId || await getPrimaryStallId();
 
-  // 1. Fetch Today's Orders using the shared service
-  const todayOrders = await fetchOrders({
-    stallId: actualStallId,
-    date: formatDateKey(today),
-    includeCancelled: false,
-  });
+  // 1. Fetch Today's Orders & Holiday
+  const [todayOrders, holidayToday] = await Promise.all([
+    fetchOrders({
+      stallId: actualStallId,
+      date: formatDateKey(today),
+      includeCancelled: false,
+    }),
+    getHolidayForDate(formatDateKey(today), actualStallId)
+  ]);
 
   // 2. Fetch Active Subscriptions
   // Assuming a stall_id or just count all active for single-stall operation
@@ -131,7 +136,8 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
       subscriptionOrders,
       cashOrders,
       pendingRequiresAttention,
-    }
+    },
+    holidayToday,
   };
 };
 
@@ -159,19 +165,23 @@ export interface TomorrowReservationDetails {
     quantity: number;
     expectedPickupSlot?: string;
   }[];
+  holidayTomorrow: KitchenHoliday | null;
 }
 
 export const fetchTomorrowReservationsDetailed = async (stallId?: string): Promise<TomorrowReservationDetails> => {
   const tomorrow = getKitchenTomorrow();
   const actualStallId = stallId || await getPrimaryStallId();
 
-  // Fetch all orders for tomorrow using the shared service
-  const orders = await fetchOrders({
-    stallId: actualStallId,
-    date: formatDateKey(tomorrow),
-    includeCancelled: false,
-    statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
-  });
+  // Fetch all orders for tomorrow & check holiday
+  const [orders, holidayTomorrow] = await Promise.all([
+    fetchOrders({
+      stallId: actualStallId,
+      date: formatDateKey(tomorrow),
+      includeCancelled: false,
+      statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
+    }),
+    getHolidayForDate(formatDateKey(tomorrow), actualStallId)
+  ]);
 
   let totalMealsReserved = 0;
   const mealBreakdown: Record<string, number> = {};
@@ -207,6 +217,7 @@ export const fetchTomorrowReservationsDetailed = async (stallId?: string): Promi
     totalMealsReserved,
     mealBreakdown,
     customerBreakdown,
+    holidayTomorrow,
   };
 };
 

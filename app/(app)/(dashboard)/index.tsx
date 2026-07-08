@@ -35,6 +35,7 @@ export default function DashboardScreen() {
   }
 
   if (error || !metrics) {
+    console.error("Dashboard Load Error:", error);
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <EmptyState icon="alert-circle-outline" title="Dashboard Error" subtitle="Failed to load live metrics." />
@@ -70,14 +71,23 @@ export default function DashboardScreen() {
       </View>
 
       {/* Kitchen Status */}
-      <View style={styles.statusBar}>
-        <View style={styles.statusDot} />
-        <Text style={styles.statusText}>Kitchen Active · Live Sync</Text>
-      </View>
+      {metrics.holidayToday ? (
+        <View style={[styles.statusBar, { backgroundColor: Colors.error + '20', borderColor: Colors.error }]}>
+          <Ionicons name="warning" size={16} color={Colors.error} style={{ marginRight: Spacing.xs }} />
+          <Text style={[styles.statusText, { color: Colors.error, fontFamily: Typography.family.bold }]}>
+            KITCHEN CLOSED: {metrics.holidayToday.title.toUpperCase()}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.statusBar}>
+          <View style={styles.statusDot} />
+          <Text style={styles.statusText}>Kitchen Active · Live Sync</Text>
+        </View>
+      )}
 
       {/* Section: Today */}
       <Text style={styles.sectionTitle}>
-        TODAY • {formatDisplayDate(today).toUpperCase()}
+        {formatDisplayDate(today).toUpperCase()}
       </Text>
 
       <View style={styles.metricsRow}>
@@ -159,7 +169,7 @@ export default function DashboardScreen() {
 
       {/* Section: Tomorrow */}
       <Text style={styles.sectionTitle}>
-        TOMORROW • {formatDisplayDate(tomorrow).toUpperCase()}
+        {formatDisplayDate(tomorrow).toUpperCase()}
       </Text>
 
       <TouchableOpacity 

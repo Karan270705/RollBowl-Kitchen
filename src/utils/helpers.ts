@@ -42,11 +42,24 @@ export function formatDateKey(date: Date): string {
  * Formats a date for display (e.g., "Sat, Jun 28").
  */
 export function formatDisplayDate(date: Date): string {
-  return date.toLocaleDateString('en-IN', {
-    weekday: 'short',
-    month: 'short',
+  const targetStr = formatDateKey(date);
+  const todayStr = formatDateKey(getKitchenDate());
+  const tomorrowStr = formatDateKey(getKitchenTomorrow());
+
+  let suffix = '';
+  if (targetStr === todayStr) {
+    suffix = ' (Today)';
+  } else if (targetStr === tomorrowStr) {
+    suffix = ' (Tomorrow)';
+  }
+
+  const baseFormat = date.toLocaleDateString('en-IN', {
+    weekday: 'long',
     day: 'numeric',
+    month: 'long',
   });
+
+  return `${baseFormat}${suffix}`;
 }
 
 /**

@@ -91,7 +91,18 @@ export default function TomorrowReservationsScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         
-        {/* Summary Card */}
+        {data.holidayTomorrow ? (
+          <View style={styles.holidayContainer}>
+            <Ionicons name="alert-circle" size={64} color={Colors.error} style={{ marginBottom: Spacing.md }} />
+            <Text style={styles.holidayTitle}>KITCHEN CLOSED</Text>
+            <Text style={styles.holidayReason}>{data.holidayTomorrow.title.toUpperCase()}</Text>
+            {data.holidayTomorrow.description && (
+              <Text style={styles.holidayDesc}>{data.holidayTomorrow.description}</Text>
+            )}
+          </View>
+        ) : (
+          <React.Fragment>
+            {/* Summary Card */}
         <Text style={styles.sectionTitle}>Summary</Text>
         <View style={styles.summaryCard}>
           <View style={styles.summaryRow}>
@@ -179,6 +190,8 @@ export default function TomorrowReservationsScreen() {
             ))}
           </View>
         )}
+          </React.Fragment>
+        )}
       </ScrollView>
     </View>
   );
@@ -219,6 +232,37 @@ const styles = StyleSheet.create({
   content: {
     padding: Spacing.base,
     paddingBottom: Spacing['4xl'],
+  },
+  holidayContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing['2xl'],
+    marginTop: Spacing['4xl'],
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.lg,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    borderStyle: 'dashed',
+  },
+  holidayTitle: {
+    fontSize: Typography.size.xl,
+    fontFamily: Typography.family.bold,
+    color: Colors.error,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
+  },
+  holidayReason: {
+    fontSize: Typography.size.lg,
+    fontFamily: Typography.family.semiBold,
+    color: Colors.textPrimary,
+    marginBottom: Spacing.xs,
+    textAlign: 'center',
+  },
+  holidayDesc: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.regular,
+    color: Colors.textSecondary,
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: Typography.size.sm,

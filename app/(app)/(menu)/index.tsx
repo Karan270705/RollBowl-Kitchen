@@ -14,6 +14,7 @@ import {
   useRemoveMealFromMenu,
   useCopyMenu,
 } from '@/src/hooks/useMenu';
+import { useHolidayForDate } from '@/src/hooks/useHolidays';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function MenuScreen() {
@@ -23,7 +24,9 @@ export default function MenuScreen() {
   );
   const [modalVisible, setModalVisible] = useState(false);
 
-  const isLocked = isMenuLocked(selectedDateStr);
+  const { data: holidayData } = useHolidayForDate(selectedDateStr);
+
+  const isLocked = isMenuLocked(selectedDateStr) || !!holidayData;
 
   // Queries
   const { data: menuData, isLoading: menuLoading } = useMenuForDate(selectedDateStr);
@@ -96,12 +99,19 @@ export default function MenuScreen() {
         </Text>
       </View>
 
-      {isLocked && (
+      {holidayData ? (
+        <View style={[styles.lockedBanner, { backgroundColor: Colors.error + '20', borderColor: Colors.error }]}>
+          <Ionicons name="warning" size={16} color={Colors.error} />
+          <Text style={[styles.lockedText, { color: Colors.error, fontFamily: Typography.family.bold }]}>
+            Holiday: {holidayData.title.toUpperCase()}. No menu can be published.
+          </Text>
+        </View>
+      ) : isLocked ? (
         <View style={styles.lockedBanner}>
           <Ionicons name="lock-closed" size={16} color={Colors.warning} />
           <Text style={styles.lockedText}>Menu Locked: Orders have already closed for this date.</Text>
         </View>
-      )}
+      ) : null}
 
       {menuLoading ? (
         <View style={styles.center}>
