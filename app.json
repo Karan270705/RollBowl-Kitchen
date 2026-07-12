@@ -2,6 +2,7 @@
   "expo": {
     "name": "RollBowl Kitchen",
     "slug": "rollbowl-kitchen",
+    "owner": "karang2707s-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -13,14 +14,14 @@
       "bundleIdentifier": "com.rollbowl.kitchen"
     },
     "android": {
+      "package": "com.rollbowl.kitchen",
       "adaptiveIcon": {
         "backgroundColor": "#0F1117",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.rollbowl.kitchen"
+      "edgeToEdgeEnabled": true
     },
     "web": {
       "output": "static",
@@ -42,6 +43,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d4ae3d3f-d834-4c20-854e-71e15c35f2cb"
+      }
     }
   }
 }
