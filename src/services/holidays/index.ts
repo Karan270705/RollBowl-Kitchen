@@ -29,56 +29,73 @@ export const fetchHolidays = async (stallId?: string): Promise<KitchenHoliday[]>
 export const addHoliday = async (params: { holidayDate: string; title: string; description?: string; stallId?: string }): Promise<void> => {
   const actualStallId = params.stallId || await getPrimaryStallId();
 
-  // 1. Insert Holiday
-  const { error: insertError } = await supabase
+  // 1. Check if a disabled holiday already exists for this date (handles re-adding after disable)
+  const { data: existing, error: checkError } = await supabase
     .from('kitchen_holidays')
-    .insert({
-      stall_id: actualStallId,
-      holiday_date: params.holidayDate,
-      title: params.title,
-      description: params.description,
-    });
+    .select('id, is_active')
+    .eq('stall_id', actualStallId)
+    .eq('holiday_date', params.holidayDate)
+    .maybeSingle();
 
-  if (insertError) throw insertError;
+  if (checkError) throw checkError;
 
-  // 2. Extend Affected Subscriptions
-  // Find all active subscriptions where end_date >= holidayDate
-  const { data: subs, error: subsError } = await supabase
-    .from('subscriptions')
-    .select('id, end_date, extended_days')
-    .eq('status', 'active')
-    .gte('end_date', params.holidayDate);
-
-  if (subsError) throw subsError;
-
-  if (subs && subs.length > 0) {
-    // We update each one to add 1 day to end_date and increment extended_days
-    for (const sub of subs) {
-      const newEndDate = new Date(sub.end_date);
-      newEndDate.setDate(newEndDate.getDate() + 1);
-
-      await supabase
-        .from('subscriptions')
-        .update({
-          end_date: newEndDate.toISOString().split('T')[0],
-          extended_days: (sub.extended_days || 0) + 1,
-        })
-        .eq('id', sub.id);
+  if (existing) {
+    if (existing.is_active) {
+      throw new Error('A holiday already exists for this date.');
     }
+
+    // Re-enable the disabled holiday with updated title/description
+    const { error: updateError } = await supabase
+      .from('kitchen_holidays')
+      .update({
+        title: params.title,
+        description: params.description,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id);
+
+    if (updateError) throw updateError;
+  } else {
+    // Insert new holiday
+    const { error: insertError } = await supabase
+      .from('kitchen_holidays')
+      .insert({
+        stall_id: actualStallId,
+        holiday_date: params.holidayDate,
+        title: params.title,
+        description: params.description,
+      });
+
+    if (insertError) throw insertError;
   }
+
+  // 2. Extend Affected Subscriptions via Database RPC
+  const { error: rpcError } = await supabase.rpc('recalculate_overlapping_subscriptions', {
+    p_stall_id: actualStallId,
+    p_holiday_date: params.holidayDate
+  });
+  if (rpcError) throw rpcError;
 };
+
 
 export const updateHolidayStatus = async (holidayId: string, isActive: boolean): Promise<void> => {
   // 1. Get the holiday to know its date
   const { data: holiday, error: getError } = await supabase
     .from('kitchen_holidays')
-    .select('holiday_date, is_active')
+    .select('holiday_date, is_active, stall_id')
     .eq('id', holidayId)
     .single();
 
   if (getError) throw getError;
   
   if (holiday.is_active === isActive) return; // No change
+
+  // Check if historical
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (holiday.holiday_date < todayStr) {
+    throw new Error('Historical holidays cannot be modified.');
+  }
 
   // 2. Update Holiday
   const { error: updateError } = await supabase
@@ -88,34 +105,13 @@ export const updateHolidayStatus = async (holidayId: string, isActive: boolean):
 
   if (updateError) throw updateError;
 
-  // 3. Apply/Rollback Subscription Extensions
-  const modifier = isActive ? 1 : -1;
-
-  const { data: subs, error: subsError } = await supabase
-    .from('subscriptions')
-    .select('id, end_date, extended_days')
-    .eq('status', 'active')
-    .gte('end_date', holiday.holiday_date);
-
-  if (subsError) throw subsError;
-
-  if (subs && subs.length > 0) {
-    for (const sub of subs) {
-      const newEndDate = new Date(sub.end_date);
-      newEndDate.setDate(newEndDate.getDate() + modifier);
-
-      // Ensure we don't drop below 0 for extended_days
-      const newExtendedDays = Math.max(0, (sub.extended_days || 0) + modifier);
-
-      await supabase
-        .from('subscriptions')
-        .update({
-          end_date: newEndDate.toISOString().split('T')[0],
-          extended_days: newExtendedDays,
-        })
-        .eq('id', sub.id);
-    }
-  }
+  // 3. Apply/Rollback Subscription Extensions via Database RPC
+  const { error: rpcError } = await supabase.rpc('recalculate_overlapping_subscriptions', {
+    p_stall_id: holiday.stall_id,
+    p_holiday_date: holiday.holiday_date
+  });
+  
+  if (rpcError) throw rpcError;
 };
 
 export const getHolidayForDate = async (date: string, stallId?: string): Promise<KitchenHoliday | null> => {
