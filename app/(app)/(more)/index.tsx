@@ -43,97 +43,6 @@ export default function MoreScreen() {
     );
   };
 
-  const handleTestSpike = async () => {
-    try {
-      setSigningOut(true); // just reusing loading state for quick test
-      
-      const wb = XLSX.utils.book_new();
-
-      // Summary Sheet
-      const wsSummary = XLSX.utils.aoa_to_sheet([
-        ['Metric', 'Value'],
-        ['Total Revenue', 5000],
-        ['Most Popular', 'Paneer Roll 🌶️']
-      ]);
-      wsSummary['!cols'] = [{ wch: 20 }, { wch: 15 }];
-      XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
-
-      // Orders Sheet
-      const wsOrders = XLSX.utils.aoa_to_sheet([
-        ['Order ID', 'Date', 'Customer Name', 'Total Amount', 'Notes'],
-        ['ORD-1234567890123456789', new Date(), 'Rajesh Kumar', 250.50, 'Extra spicy,\nplease!'],
-        ['ORD-9876543210987654321', new Date(), 'Priya Sharma', 150.00, 'No onions']
-      ]);
-      wsOrders['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 30 }];
-      XLSX.utils.book_append_sheet(wb, wsOrders, 'Orders');
-
-      // Order Items Sheet
-      const wsItems = XLSX.utils.aoa_to_sheet([
-        ['Order ID', 'Item Name', 'Quantity', 'Price'],
-        ['ORD-1234567890123456789', 'Paneer Tikka Roll', 2, 125.25],
-        ['ORD-9876543210987654321', 'Aloo Paratha', 1, 150.00]
-      ]);
-      wsItems['!cols'] = [{ wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 15 }];
-      XLSX.utils.book_append_sheet(wb, wsItems, 'Order Items');
-
-      // Generate base64
-      const base64 = XLSX.write(wb, { type: 'base64', bookType: 'xlsx' });
-      
-      const uri = FileSystem.cacheDirectory + 'RollBowl_SheetJSSpike.xlsx';
-      await FileSystem.writeAsStringAsync(uri, base64, { encoding: FileSystem.EncodingType.Base64 });
-      
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          dialogTitle: 'Share SheetJS Spike'
-        });
-      } else {
-        Alert.alert('Error', 'Sharing not available on this device');
-      }
-    } catch (error: any) {
-      Alert.alert('Spike Failed', error.message);
-    } finally {
-      setSigningOut(false);
-    }
-  };
-
-  const handleTestCsvSpike = async () => {
-    try {
-      setSigningOut(true);
-      
-      // Helper to safely escape CSV fields
-      const escapeCsv = (val: any) => {
-        if (val == null) return '';
-        const str = String(val);
-        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-          return `"${str.replace(/"/g, '""')}"`;
-        }
-        return str;
-      };
-
-      const rows = [
-        ['Order ID', 'Customer Name', 'Notes', 'Total (₹)'],
-        ['ORD-1', 'Aisha Khan', 'No onions, please', 250.50],
-        ['ORD-2', 'Suresh 🌟', 'Call on arrival\n"Urgent"', 150.00]
-      ];
-      
-      // Add UTF-8 BOM (\uFEFF) for Excel compatibility
-      const csvContent = '\uFEFF' + rows.map(r => r.map(escapeCsv).join(',')).join('\n');
-      
-      const uri = FileSystem.cacheDirectory + 'RollBowl_SpikeTest.csv';
-      await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
-      
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
-      } else {
-        Alert.alert('Error', 'Sharing not available on this device');
-      }
-    } catch (error: any) {
-      Alert.alert('CSV Spike Failed', error.message);
-    } finally {
-      setSigningOut(false);
-    }
-  };
 
 
   return (
@@ -191,36 +100,13 @@ export default function MoreScreen() {
 
         <TouchableOpacity 
           style={styles.infoRow}
-          onPress={handleTestSpike}
-          disabled={signingOut}
+          onPress={() => router.push('/(app)/(more)/export')}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
             <Ionicons name="document-text-outline" size={20} color={Colors.textPrimary} />
-            <Text style={styles.infoLabel}>TEST XLSX SPIKE</Text>
+            <Text style={styles.infoLabel}>Export Orders</Text>
           </View>
-          {signingOut ? (
-            <Text style={{color: Colors.textSecondary, fontSize: 12}}>Running...</Text>
-          ) : (
-            <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.infoDivider} />
-
-        <TouchableOpacity 
-          style={styles.infoRow}
-          onPress={handleTestCsvSpike}
-          disabled={signingOut}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <Ionicons name="document-text-outline" size={20} color={Colors.textPrimary} />
-            <Text style={styles.infoLabel}>TEST CSV SPIKE</Text>
-          </View>
-          {signingOut ? (
-            <Text style={{color: Colors.textSecondary, fontSize: 12}}>Running...</Text>
-          ) : (
-            <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />
-          )}
+          <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />
         </TouchableOpacity>
       </Card>
 
