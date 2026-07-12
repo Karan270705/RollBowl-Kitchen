@@ -1,10 +1,32 @@
 /**
  * Date utilities for kitchen date-based workflows.
- * Kitchen operations revolve around specific dates (today's orders,
- * tomorrow's menu, etc.). These helpers provide consistent date handling.
+ * The Business Calendar acts as the single source of truth for the
+ * operational timeline across the entire application.
  */
 
 import { AppConfig } from '@/src/constants/config';
+
+export interface OperationalContext {
+  executionDate: Date;
+  operationalDate: Date;
+}
+
+export function getOperationalContext(): OperationalContext {
+  const executionDate = getKitchenDate();
+  const currentHour = new Date().getHours();
+  
+  // 2 PM is the hard operational cutoff for the kitchen.
+  const isAfterExecutionCutoff = currentHour >= 14;
+
+  let operationalDate = executionDate;
+
+  if (isAfterExecutionCutoff) {
+    // After 2 PM: Today is operationally finished. The planning focus completely snaps to TOMORROW.
+    operationalDate = getKitchenTomorrow();
+  }
+
+  return { executionDate, operationalDate };
+}
 
 /**
  * Gets the current "kitchen date" — accounts for day rollover.

@@ -6,7 +6,7 @@ import {
   removeMealFromMenu,
   copyMenu,
   getAllMeals,
-  getTomorrowMenuStatus,
+  getOperationalMenuStatus,
 } from '@/src/services/menu';
 
 export const useMenuForDate = (date: string) => {
@@ -23,10 +23,10 @@ export const useMealsPool = () => {
   });
 };
 
-export const useTomorrowMenuStatus = () => {
+export const useOperationalMenuStatus = () => {
   return useQuery({
-    queryKey: ['menu', 'tomorrow-status'],
-    queryFn: getTomorrowMenuStatus,
+    queryKey: ['menu', 'operational-status'],
+    queryFn: getOperationalMenuStatus,
     refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes
   });
 };
@@ -45,7 +45,7 @@ export const useSaveMenuMeals = (date: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menu', date] });
-      queryClient.invalidateQueries({ queryKey: ['menu', 'tomorrow-status'] });
+      queryClient.invalidateQueries({ queryKey: ['menu', 'operational-status'] });
     },
   });
 };

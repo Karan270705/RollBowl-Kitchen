@@ -1,13 +1,13 @@
 import { supabase } from '@/src/lib/supabase';
 import { getPrimaryStallId } from '@/src/services/menu';
-import { getKitchenDate, getKitchenTomorrow, formatDateKey } from '@/src/utils/helpers';
+import { getOperationalContext, formatDateKey } from '@/src/utils/helpers';
 import { useQuery } from '@tanstack/react-query';
 import { Order, KitchenHoliday } from '@/src/types/models';
 import { fetchOrders } from '@/src/services/orders';
 import { getHolidayForDate } from '@/src/services/holidays';
 
 export interface DashboardMetrics {
-  todayOrders: {
+  executionOrders: {
     total: number;
     pending: number;
     accepted: number;
@@ -15,30 +15,31 @@ export interface DashboardMetrics {
     collected: number;
   };
   activeSubscribers: number;
-  tomorrowReservations: number;
-  tomorrowTotalMeals: number;
+  operationalReservations: number;
+  operationalTotalMeals: number;
   insights: {
     mostOrderedMeal: string | null;
     subscriptionOrders: number;
     cashOrders: number;
     pendingRequiresAttention: number; // Pending for > 15 mins
   };
-  holidayToday: KitchenHoliday | null;
+  holidayExecution: KitchenHoliday | null;
+  holidayOperational: KitchenHoliday | null;
 }
 
 export const fetchDashboardMetrics = async (stallId?: string): Promise<DashboardMetrics> => {
-  const today = getKitchenDate();
-  const tomorrow = getKitchenTomorrow();
+  const { executionDate, operationalDate } = getOperationalContext();
   const actualStallId = stallId || await getPrimaryStallId();
 
-  // 1. Fetch Today's Orders & Holiday
-  const [todayOrders, holidayToday] = await Promise.all([
+  // 1. Fetch Execution Orders & Holidays
+  const [executionOrdersList, holidayExecution, holidayOperational] = await Promise.all([
     fetchOrders({
       stallId: actualStallId,
-      date: formatDateKey(today),
+      date: formatDateKey(executionDate),
       includeCancelled: false,
     }),
-    getHolidayForDate(formatDateKey(today), actualStallId)
+    getHolidayForDate(formatDateKey(executionDate), actualStallId),
+    getHolidayForDate(formatDateKey(operationalDate), actualStallId)
   ]);
 
   // 2. Fetch Active Subscriptions
@@ -50,35 +51,35 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
 
   if (subError) throw subError;
 
-  // 3. Fetch Tomorrow's Reservations
-  const tomorrowOrders = await fetchOrders({
+  // 3. Fetch Operational Reservations
+  const operationalOrders = await fetchOrders({
     stallId: actualStallId,
-    date: formatDateKey(tomorrow),
+    date: formatDateKey(operationalDate),
     includeCancelled: false,
     statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
   });
 
-  let tomorrowTotalMeals = 0;
-  for (const order of tomorrowOrders) {
+  let operationalTotalMeals = 0;
+  for (const order of operationalOrders) {
     if (order.items) {
       for (const item of order.items) {
-        tomorrowTotalMeals += item.quantity;
+        operationalTotalMeals += item.quantity;
       }
     }
   }
 
-  const tomorrowResCount = tomorrowOrders.length;
+  const operationalResCount = operationalOrders.length;
 
   // 4. Calculate Metrics
-  console.log(`[Dashboard] Received ${todayOrders.length} orders for today.`);
-  console.log('[Dashboard] Array:', JSON.stringify(todayOrders.map(o => ({ id: o.id, status: o.status, pickupDate: o.pickupDate })), null, 2));
+  console.log(`[Dashboard] Received ${executionOrdersList.length} execution orders.`);
+  console.log('[Dashboard] Array:', JSON.stringify(executionOrdersList.map(o => ({ id: o.id, status: o.status, pickupDate: o.pickupDate })), null, 2));
 
   let pending = 0, accepted = 0, ready = 0, collected = 0;
   let subscriptionOrders = 0, cashOrders = 0, pendingRequiresAttention = 0;
 
   const now = new Date().getTime();
 
-  for (const order of todayOrders) {
+  for (const order of executionOrdersList) {
     if (order.status === 'pending') pending++;
     else if (order.status === 'confirmed' || order.status === 'preparing') accepted++;
     else if (order.status === 'ready') ready++;
@@ -97,12 +98,12 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
   }
 
   // 5. Most Ordered Meal
-  // Need to join order_items for today's orders
+  // Need to join order_items for execution orders
   const { data: orderItemsData, error: itemsError } = await supabase
     .from('order_items')
     .select('meal_name, quantity, orders!inner(id, pickup_date, stall_id)')
     .eq('orders.stall_id', actualStallId)
-    .eq('orders.pickup_date', formatDateKey(today));
+    .eq('orders.pickup_date', formatDateKey(executionDate));
 
   let mostOrderedMeal = null;
   if (!itemsError && orderItemsData) {
@@ -121,29 +122,30 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
   }
 
   return {
-    todayOrders: {
-      total: todayOrders.length,
+    executionOrders: {
+      total: executionOrdersList.length,
       pending,
       accepted,
       ready,
       collected,
     },
     activeSubscribers: activeSubCount || 0,
-    tomorrowReservations: tomorrowResCount || 0,
-    tomorrowTotalMeals: tomorrowTotalMeals,
+    operationalReservations: operationalResCount || 0,
+    operationalTotalMeals: operationalTotalMeals,
     insights: {
       mostOrderedMeal,
       subscriptionOrders,
       cashOrders,
       pendingRequiresAttention,
     },
-    holidayToday,
+    holidayExecution,
+    holidayOperational,
   };
 };
 
 export const useDashboardMetrics = () => {
   return useQuery({
-    queryKey: ['dashboard_metrics', formatDateKey(getKitchenDate())],
+    queryKey: ['dashboard_metrics', formatDateKey(getOperationalContext().executionDate)],
     queryFn: () => {
       return fetchDashboardMetrics();
     },
@@ -151,7 +153,7 @@ export const useDashboardMetrics = () => {
   });
 };
 
-export interface TomorrowReservationDetails {
+export interface OperationalReservationDetails {
   totalReservations: number;
   uniqueCustomers: number;
   totalMealsReserved: number;
@@ -165,22 +167,22 @@ export interface TomorrowReservationDetails {
     quantity: number;
     expectedPickupSlot?: string;
   }[];
-  holidayTomorrow: KitchenHoliday | null;
+  holidayOperational: KitchenHoliday | null;
 }
 
-export const fetchTomorrowReservationsDetailed = async (stallId?: string): Promise<TomorrowReservationDetails> => {
-  const tomorrow = getKitchenTomorrow();
+export const fetchOperationalReservationsDetailed = async (stallId?: string): Promise<OperationalReservationDetails> => {
+  const { operationalDate } = getOperationalContext();
   const actualStallId = stallId || await getPrimaryStallId();
 
-  // Fetch all orders for tomorrow & check holiday
-  const [orders, holidayTomorrow] = await Promise.all([
+  // Fetch all orders for operational date & check holiday
+  const [orders, holidayOperational] = await Promise.all([
     fetchOrders({
       stallId: actualStallId,
-      date: formatDateKey(tomorrow),
+      date: formatDateKey(operationalDate),
       includeCancelled: false,
       statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
     }),
-    getHolidayForDate(formatDateKey(tomorrow), actualStallId)
+    getHolidayForDate(formatDateKey(operationalDate), actualStallId)
   ]);
 
   let totalMealsReserved = 0;
@@ -217,14 +219,14 @@ export const fetchTomorrowReservationsDetailed = async (stallId?: string): Promi
     totalMealsReserved,
     mealBreakdown,
     customerBreakdown,
-    holidayTomorrow,
+    holidayOperational,
   };
 };
 
-export const useTomorrowReservationsDetailed = () => {
+export const useOperationalReservationsDetailed = () => {
   return useQuery({
-    queryKey: ['tomorrow_reservations_detailed', formatDateKey(getKitchenTomorrow())],
-    queryFn: () => fetchTomorrowReservationsDetailed(),
+    queryKey: ['operational_reservations_detailed', formatDateKey(getOperationalContext().operationalDate)],
+    queryFn: () => fetchOperationalReservationsDetailed(),
     refetchInterval: 60000,
   });
 };

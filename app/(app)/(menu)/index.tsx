@@ -6,7 +6,7 @@ import { CalendarStrip } from '@/src/components/ui/CalendarStrip';
 import { MenuItemCard } from '@/src/components/menu/MenuItemCard';
 import { MealSelectionModal } from '@/src/components/menu/MealSelectionModal';
 import { Button } from '@/src/components/ui/Button';
-import { getKitchenDate, getKitchenTomorrow, isMenuLocked } from '@/src/utils/helpers';
+import { getOperationalContext, isMenuLocked, formatDateKey } from '@/src/utils/helpers';
 import {
   useMenuForDate,
   useMealsPool,
@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
   const [selectedDateStr, setSelectedDateStr] = useState<string>(
-    getKitchenTomorrow().toISOString().split('T')[0]
+    formatDateKey(getOperationalContext().operationalDate)
   );
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -64,7 +64,7 @@ export default function MenuScreen() {
   };
 
   const handleCopyFromToday = () => {
-    const todayStr = getKitchenDate().toISOString().split('T')[0];
+    const todayStr = formatDateKey(getOperationalContext().executionDate);
     if (todayStr === selectedDateStr) {
       Alert.alert('Invalid', 'Cannot copy today to today.');
       return;

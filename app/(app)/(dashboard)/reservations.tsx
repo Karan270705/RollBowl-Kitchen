@@ -4,16 +4,16 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
-import { useTomorrowReservationsDetailed } from '@/src/services/dashboard';
+import { useOperationalReservationsDetailed } from '@/src/services/dashboard';
 import { EmptyState } from '@/src/components/ui';
-import { getKitchenTomorrow, formatDisplayDate } from '@/src/utils/helpers';
+import { getOperationalContext, formatDisplayDate } from '@/src/utils/helpers';
 
-export default function TomorrowReservationsScreen() {
+export default function OperationalReservationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data, isLoading, error } = useTomorrowReservationsDetailed();
+  const { data, isLoading, error } = useOperationalReservationsDetailed();
 
-  const tomorrow = getKitchenTomorrow();
+  const { operationalDate } = getOperationalContext();
 
   const SLOT_ORDER = [
     '12:00–12:30',
@@ -83,21 +83,21 @@ export default function TomorrowReservationsScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerTitles}>
-          <Text style={styles.headerTitle}>Reservations</Text>
-          <Text style={styles.headerSubtitle}>{formatDisplayDate(tomorrow)}</Text>
+          <Text style={styles.headerTitle}>Order Reservations</Text>
+          <Text style={styles.headerSubtitle}>{formatDisplayDate(operationalDate)}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         
-        {data.holidayTomorrow ? (
+        {data.holidayOperational ? (
           <View style={styles.holidayContainer}>
             <Ionicons name="alert-circle" size={64} color={Colors.error} style={{ marginBottom: Spacing.md }} />
             <Text style={styles.holidayTitle}>KITCHEN CLOSED</Text>
-            <Text style={styles.holidayReason}>{data.holidayTomorrow.title.toUpperCase()}</Text>
-            {data.holidayTomorrow.description && (
-              <Text style={styles.holidayDesc}>{data.holidayTomorrow.description}</Text>
+            <Text style={styles.holidayReason}>{data.holidayOperational.title.toUpperCase()}</Text>
+            {data.holidayOperational.description && (
+              <Text style={styles.holidayDesc}>{data.holidayOperational.description}</Text>
             )}
           </View>
         ) : (
