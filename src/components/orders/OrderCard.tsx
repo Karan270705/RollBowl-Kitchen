@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { Order, OrderItem } from '@/src/types/models';
 import { useUpdateOrderStatus, useUpdateOrderPaymentStatus } from '@/src/hooks/useOrders';
+import { PaymentProofViewerModal } from '../payments/PaymentProofViewerModal';
 
 interface OrderCardProps {
   order: Order;
@@ -12,6 +13,13 @@ interface OrderCardProps {
 export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
   const { mutate: updateStatus, isPending } = useUpdateOrderStatus();
   const { mutate: updatePaymentStatus, isPending: isPaymentPending } = useUpdateOrderPaymentStatus();
+  const [isProofModalVisible, setIsProofModalVisible] = useState(false);
+
+  const isUpiOrder = order.paymentMethod === 'upi';
+  const isPendingVerification = order.paymentVerificationStatus === 'pending';
+  const hasProofSubmitted = order.paymentVerificationStatus === 'pending' || 
+                             order.paymentVerificationStatus === 'verified' || 
+                             order.paymentVerificationStatus === 'rejected';
 
   // Status flow: pending → confirmed (Accepted) → ready → picked_up
   const getNextAction = () => {
@@ -29,6 +37,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
   };
 
   const action = getNextAction();
+
+  const isAcceptAction = action && action.nextStatus === 'confirmed';
+  const isUpiUnverified = isUpiOrder && 
+    order.paymentVerificationStatus !== 'verified' && 
+    order.paymentVerificationStatus !== 'not_required';
+  const showAcceptButton = action && !(isAcceptAction && isUpiUnverified);
 
   const handleAction = () => {
     if (action) {
@@ -78,7 +92,29 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
             <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
               <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>💵 CASH</Text>
             </View>
-          ) : (order.paymentMethod === 'upi' || order.paymentMethod === 'card' || order.paymentStatus === 'paid') ? (
+          ) : order.paymentMethod === 'upi' ? (
+            order.paymentVerificationStatus === 'pending' ? (
+              <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
+                <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>⏳ UPI Pending</Text>
+              </View>
+            ) : order.paymentVerificationStatus === 'verified' || order.paymentStatus === 'paid' ? (
+              <View style={[styles.slotBadge, { backgroundColor: Colors.success + '20', borderColor: Colors.success }]}>
+                <Text style={[styles.slotText, { color: Colors.success, fontFamily: Typography.family.bold }]}>✅ UPI Paid</Text>
+              </View>
+            ) : order.paymentVerificationStatus === 'rejected' ? (
+              <View style={[styles.slotBadge, { backgroundColor: Colors.error + '20', borderColor: Colors.error }]}>
+                <Text style={[styles.slotText, { color: Colors.error, fontFamily: Typography.family.bold }]}>❌ UPI Rejected</Text>
+              </View>
+            ) : order.paymentVerificationStatus === 'expired' ? (
+              <View style={[styles.slotBadge, { backgroundColor: Colors.error + '20', borderColor: Colors.error }]}>
+                <Text style={[styles.slotText, { color: Colors.error, fontFamily: Typography.family.bold }]}>❌ UPI Expired</Text>
+              </View>
+            ) : (
+              <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
+                <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>⏳ UPI Awaiting</Text>
+              </View>
+            )
+          ) : (order.paymentMethod === 'card' || order.paymentStatus === 'paid') ? (
             <View style={[styles.slotBadge, { backgroundColor: Colors.success + '20', borderColor: Colors.success }]}>
               <Text style={[styles.slotText, { color: Colors.success, fontFamily: Typography.family.bold }]}>✅ Paid</Text>
             </View>
@@ -109,7 +145,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
         </View>
       )}
 
-      {(action || (order.paymentMethod === 'cash' && order.paymentStatus === 'pending')) && (
+      {(action || (order.paymentMethod === 'cash' && order.paymentStatus === 'pending') || (isUpiOrder && hasProofSubmitted)) && (
         <View style={styles.actionContainer}>
           {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' && (
             <TouchableOpacity 
@@ -125,7 +161,26 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
             </TouchableOpacity>
           )}
 
-          {action && (
+          {isUpiOrder && hasProofSubmitted && (
+            <TouchableOpacity 
+              style={[
+                styles.actionButton, 
+                { 
+                  backgroundColor: isPendingVerification ? Colors.primary : Colors.surfaceHighlight,
+                  borderWidth: isPendingVerification ? 0 : 1,
+                  borderColor: Colors.border,
+                  marginBottom: showAcceptButton ? Spacing.sm : 0 
+                }
+              ]}
+              onPress={() => setIsProofModalVisible(true)}
+            >
+              <Text style={[styles.actionText, { color: isPendingVerification ? Colors.white : Colors.textPrimary }]}>
+                {isPendingVerification ? 'Verify Payment Proof' : 'View Payment Receipt'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {showAcceptButton && (
             <TouchableOpacity 
               style={[styles.actionButton, { backgroundColor: action.color }]}
               onPress={handleAction}
@@ -138,8 +193,26 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
               )}
             </TouchableOpacity>
           )}
+
+          {isAcceptAction && isUpiUnverified && (
+            <View style={styles.disabledActionNote}>
+              <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
+              <Text style={styles.disabledActionNoteText}>
+                {order.paymentVerificationStatus === 'pending' && 'Verify payment proof to accept order'}
+                {order.paymentVerificationStatus === 'rejected' && 'Payment proof rejected. Awaiting new submission.'}
+                {order.paymentVerificationStatus === 'awaiting_proof' && 'Awaiting payment proof from customer.'}
+                {order.paymentVerificationStatus === 'expired' && 'Payment proof expired.'}
+              </Text>
+            </View>
+          )}
         </View>
       )}
+
+      <PaymentProofViewerModal
+        visible={isProofModalVisible}
+        onClose={() => setIsProofModalVisible(false)}
+        orderId={order.id}
+      />
     </View>
   );
 };
@@ -278,5 +351,18 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.bold,
     fontSize: Typography.size.base,
     color: Colors.background,
+  },
+  disabledActionNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.transparent,
+  },
+  disabledActionNoteText: {
+    fontFamily: Typography.family.medium,
+    fontSize: Typography.size.xs,
+    color: Colors.textSecondary,
   },
 });

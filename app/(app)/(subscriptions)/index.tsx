@@ -4,6 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
 import { useSubscribersList } from '@/src/services/subscriptions';
+import { useSubscriptionRequests } from '@/src/hooks/usePayments';
+import { PaymentProofViewerModal } from '@/src/components/payments/PaymentProofViewerModal';
 import { EmptyState, Input } from '@/src/components/ui';
 import { useRouter } from 'expo-router';
 import { formatDisplayDate, isExpiringSoon } from '@/src/utils/helpers';
@@ -12,6 +14,10 @@ export default function SubscriptionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { data: subscribers = [], isLoading, error } = useSubscribersList();
+  const { data: requests = [], isLoading: isLoadingRequests, error: requestsError } = useSubscriptionRequests();
+
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+  const [isProofModalVisible, setIsProofModalVisible] = useState(false);
 
   const activeCount = subscribers.filter(s => s.status === 'active').length;
   const expiredCount = subscribers.filter(s => s.status === 'expired').length;
@@ -20,10 +26,34 @@ export default function SubscriptionsScreen() {
     .reduce((sum, s) => sum + s.remainingMeals, 0);
 
   const expiringSoonCount = subscribers.filter(s => isExpiringSoon(s.endDate) && s.status === 'active').length;
+  const pendingRequestsCount = requests.filter(r => r.status === 'verification_pending').length;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
   const [sortBy, setSortBy] = useState<'expiry' | 'credits' | 'name'>('expiry');
+
+  const filteredRequests = useMemo(() => {
+    let res = [...requests];
+    
+    // Filter by Tab
+    if (activeTab === 'Pending Approval') {
+      res = res.filter(r => r.status === 'verification_pending');
+    } else {
+      // Show approved/rejected/etc under other filters if they want, but default tab logic:
+      // 'Pending Approval' tab shows verification_pending requests
+    }
+
+    if (searchQuery.trim()) {
+      const lowerQ = searchQuery.toLowerCase();
+      res = res.filter(r => 
+        (r.users?.name && r.users.name.toLowerCase().includes(lowerQ)) ||
+        (r.users?.email && r.users.email.toLowerCase().includes(lowerQ)) ||
+        (r.users?.phone && r.users.phone.toLowerCase().includes(lowerQ)) ||
+        (r.subscription_plans?.name && r.subscription_plans.name.toLowerCase().includes(lowerQ))
+      );
+    }
+    return res;
+  }, [requests, searchQuery, activeTab]);
 
   const filteredAndSortedSubscribers = useMemo(() => {
     let result = [...subscribers];
@@ -88,6 +118,10 @@ export default function SubscriptionsScreen() {
             <Text style={[styles.metricValue, { color: Colors.warning }]}>{expiringSoonCount}</Text>
           </View>
           <View style={styles.metricCard}>
+            <Text style={styles.metricLabel}>Pending Approval</Text>
+            <Text style={[styles.metricValue, { color: Colors.primary }]}>{pendingRequestsCount}</Text>
+          </View>
+          <View style={styles.metricCard}>
             <Text style={styles.metricLabel}>Expired</Text>
             <Text style={[styles.metricValue, { color: Colors.textTertiary }]}>{expiredCount}</Text>
           </View>
@@ -110,7 +144,7 @@ export default function SubscriptionsScreen() {
         {/* Filters and Sorting */}
         <View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsContainer}>
-            {['All', 'Active', 'Expiring Soon', 'Paused', 'Expired', 'Cancelled'].map(tab => (
+            {['All', 'Active', 'Expiring Soon', 'Pending Approval', 'Paused', 'Expired', 'Cancelled'].map(tab => (
               <TouchableOpacity 
                 key={tab} 
                 style={[styles.tabChip, activeTab === tab && styles.tabChipActive]}
@@ -133,68 +167,145 @@ export default function SubscriptionsScreen() {
         </View>
 
         <View style={styles.listHeader}>
-          <Text style={styles.sectionTitle}>{activeTab} Subscribers ({filteredAndSortedSubscribers.length})</Text>
+          <Text style={styles.sectionTitle}>
+            {activeTab} {activeTab === 'Pending Approval' ? 'Requests' : 'Subscribers'} ({activeTab === 'Pending Approval' ? filteredRequests.length : filteredAndSortedSubscribers.length})
+          </Text>
         </View>
 
-        {isLoading ? (
-          <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
-        ) : error ? (
-          <EmptyState icon="alert-circle-outline" title="Error Loading Data" subtitle="Failed to load subscribers." />
-        ) : filteredAndSortedSubscribers.length === 0 ? (
-          <EmptyState icon="people-outline" title="No Subscribers Found" subtitle="Try adjusting your search or filters." />
-        ) : (
-          <View style={styles.listContainer}>
-            {filteredAndSortedSubscribers.map((sub) => (
-              <TouchableOpacity 
-                key={sub.id} 
-                style={styles.subscriberCard}
-                activeOpacity={0.7}
-                onPress={() => router.push(`/(app)/(subscriptions)/${sub.id}` as any)}
-              >
-                <View style={styles.cardHeader}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.customerName}>{sub.customerName}</Text>
-                    {sub.customerName === 'No Profile Name' && (
-                      <Text style={styles.userIdText}>ID: {sub.userId}</Text>
-                    )}
+        {activeTab === 'Pending Approval' ? (
+          isLoadingRequests ? (
+            <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
+          ) : requestsError ? (
+            <EmptyState icon="alert-circle-outline" title="Error Loading Data" subtitle="Failed to load requests." />
+          ) : filteredRequests.length === 0 ? (
+            <EmptyState icon="receipt-outline" title="No Requests Found" subtitle="No pending subscription purchase requests." />
+          ) : (
+            <View style={styles.listContainer}>
+              {filteredRequests.map((req) => (
+                <TouchableOpacity 
+                  key={req.id} 
+                  style={styles.subscriberCard}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setSelectedRequestId(req.id);
+                    setIsProofModalVisible(true);
+                  }}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.customerName}>{req.users?.name || 'No Profile Name'}</Text>
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: getRequestStatusColor(req.status) + '15', borderColor: getRequestStatusColor(req.status) + '40' }]}>
+                      <Text style={[styles.statusText, { color: getRequestStatusColor(req.status) }]}>{req.status.replace('_', ' ').toUpperCase()}</Text>
+                    </View>
                   </View>
-                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sub.status) + '15', borderColor: getStatusColor(sub.status) + '40' }]}>
-                    <Text style={[styles.statusText, { color: getStatusColor(sub.status) }]}>{sub.status.toUpperCase()}</Text>
-                  </View>
-                </View>
 
                   <View style={styles.contactInfo}>
                     <View style={styles.detailItem}>
                       <Ionicons name="mail-outline" size={14} color={Colors.textTertiary} />
-                      <Text style={styles.detailText}>{sub.email || 'Not Provided'}</Text>
+                      <Text style={styles.detailText}>{req.users?.email || 'Not Provided'}</Text>
                     </View>
                     <View style={styles.detailItem}>
                       <Ionicons name="call-outline" size={14} color={Colors.textTertiary} />
-                      <Text style={styles.detailText}>{sub.phone || 'Not Provided'}</Text>
+                      <Text style={styles.detailText}>{req.users?.phone || 'Not Provided'}</Text>
                     </View>
                   </View>
 
                   <View style={styles.cardDetails}>
                     <View style={styles.detailItem}>
                       <Ionicons name="card-outline" size={14} color={Colors.textTertiary} />
-                      <Text style={styles.detailText}>{sub.planName}</Text>
+                      <Text style={styles.detailText}>{req.subscription_plans?.name || 'Subscription Plan'}</Text>
                     </View>
                     <View style={styles.detailItem}>
-                      <Ionicons name="calendar-outline" size={14} color={Colors.textTertiary} />
-                      <Text style={styles.detailText}>Expires: {formatDisplayDate(new Date(sub.endDate))}</Text>
-                    </View>
-                    <View style={styles.detailItem}>
-                      <Ionicons name="nutrition-outline" size={14} color={Colors.textTertiary} />
-                      <Text style={[styles.detailText, { fontFamily: Typography.family.semiBold, color: Colors.textPrimary }]}>
-                        {sub.remainingMeals} Credits Remaining
+                      <Ionicons name="cash-outline" size={14} color={Colors.textTertiary} />
+                      <Text style={[styles.detailText, { fontFamily: Typography.family.semiBold, color: Colors.primary }]}>
+                        ₹{req.expectedAmount.toFixed(2)}
                       </Text>
                     </View>
                   </View>
+                  
+                  {req.status === 'verification_pending' && (
+                    <TouchableOpacity 
+                      style={styles.verifyRequestBtn}
+                      onPress={() => {
+                        setSelectedRequestId(req.id);
+                        setIsProofModalVisible(true);
+                      }}
+                    >
+                      <Text style={styles.verifyRequestBtnText}>Verify Payment Proof</Text>
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
-            ))}
-          </View>
+              ))}
+            </View>
+          )
+        ) : (
+          isLoading ? (
+            <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: Spacing['2xl'] }} />
+          ) : error ? (
+            <EmptyState icon="alert-circle-outline" title="Error Loading Data" subtitle="Failed to load subscribers." />
+          ) : filteredAndSortedSubscribers.length === 0 ? (
+            <EmptyState icon="people-outline" title="No Subscribers Found" subtitle="Try adjusting your search or filters." />
+          ) : (
+            <View style={styles.listContainer}>
+              {filteredAndSortedSubscribers.map((sub) => (
+                <TouchableOpacity 
+                  key={sub.id} 
+                  style={styles.subscriberCard}
+                  activeOpacity={0.7}
+                  onPress={() => router.push(`/(app)/(subscriptions)/${sub.id}` as any)}
+                >
+                  <View style={styles.cardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.customerName}>{sub.customerName}</Text>
+                      {sub.customerName === 'No Profile Name' && (
+                        <Text style={styles.userIdText}>ID: {sub.userId}</Text>
+                      )}
+                    </View>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sub.status) + '15', borderColor: getStatusColor(sub.status) + '40' }]}>
+                      <Text style={[styles.statusText, { color: getStatusColor(sub.status) }]}>{sub.status.toUpperCase()}</Text>
+                    </View>
+                  </View>
+
+                    <View style={styles.contactInfo}>
+                      <View style={styles.detailItem}>
+                        <Ionicons name="mail-outline" size={14} color={Colors.textTertiary} />
+                        <Text style={styles.detailText}>{sub.email || 'Not Provided'}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Ionicons name="call-outline" size={14} color={Colors.textTertiary} />
+                        <Text style={styles.detailText}>{sub.phone || 'Not Provided'}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.cardDetails}>
+                      <View style={styles.detailItem}>
+                        <Ionicons name="card-outline" size={14} color={Colors.textTertiary} />
+                        <Text style={styles.detailText}>{sub.planName}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Ionicons name="calendar-outline" size={14} color={Colors.textTertiary} />
+                        <Text style={styles.detailText}>Expires: {formatDisplayDate(new Date(sub.endDate))}</Text>
+                      </View>
+                      <View style={styles.detailItem}>
+                        <Ionicons name="nutrition-outline" size={14} color={Colors.textTertiary} />
+                        <Text style={[styles.detailText, { fontFamily: Typography.family.semiBold, color: Colors.textPrimary }]}>
+                          {sub.remainingMeals} Credits Remaining
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+              ))}
+            </View>
+          )
         )}
       </ScrollView>
+
+      <PaymentProofViewerModal
+        visible={isProofModalVisible}
+        onClose={() => setIsProofModalVisible(false)}
+        subscriptionRequestId={selectedRequestId || undefined}
+      />
     </View>
   );
 }
@@ -368,4 +479,28 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.medium,
     color: Colors.textSecondary,
   },
+  verifyRequestBtn: {
+    marginTop: Spacing.sm,
+    backgroundColor: Colors.primary,
+    borderRadius: Radii.sm,
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyRequestBtnText: {
+    fontFamily: Typography.family.bold,
+    fontSize: Typography.size.sm,
+    color: Colors.white,
+  },
 });
+
+const getRequestStatusColor = (status: string) => {
+  switch (status) {
+    case 'verification_pending': return Colors.primary;
+    case 'awaiting_proof': return Colors.warning;
+    case 'approved': return Colors.success;
+    case 'rejected': return Colors.error;
+    case 'cancelled': return Colors.textTertiary;
+    default: return Colors.textSecondary;
+  }
+};

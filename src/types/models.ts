@@ -102,6 +102,8 @@ export interface Order {
   orderType: 'pre_order' | 'on_stall' | 'subscription';
   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
   paymentMethod: 'upi' | 'card' | 'cash';
+  paymentVerificationStatus?: 'not_required' | 'awaiting_proof' | 'pending' | 'verified' | 'rejected' | 'expired';
+  paymentProofDeadline?: string;
   subtotal: number;
   tax: number;
   discount: number;
@@ -113,3 +115,4 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
 }
+
