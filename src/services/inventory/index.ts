@@ -395,8 +395,8 @@ export const recordInventoryMovement = async (
   quantity: number,
   note?: string,
   referenceOrderId?: string
-): Promise<void> => {
-  const { error } = await supabase.rpc('record_inventory_movement', {
+): Promise<LiveInventoryStatus> => {
+  const { data, error } = await supabase.rpc('record_inventory_movement', {
     p_batch_item_id: batchItemId,
     p_movement_type: movementType,
     p_quantity: quantity,
@@ -404,4 +404,5 @@ export const recordInventoryMovement = async (
     p_reference_order_id: referenceOrderId || null
   });
   if (error) throw parseInventoryError(error);
+  return data as LiveInventoryStatus;
 };

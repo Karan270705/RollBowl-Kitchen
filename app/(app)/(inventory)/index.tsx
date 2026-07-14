@@ -8,7 +8,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
-import { getKitchenDate, formatDateKey, formatDisplayDate } from '@/src/utils/helpers';
+import { getKitchenDate, formatDateKey, formatDisplayDate, formatTimeSlot, isBatchExpired } from '@/src/utils/helpers';
 import { useInventoryBatches, useLiveInventoryStatus, useInventoryBatchItems, useActivateBatch, useCancelBatch, useCloseBatch } from '@/src/hooks/useInventory';
 import { getPrimaryStallId } from '@/src/services/menu';
 
@@ -36,7 +36,10 @@ const BatchCard = ({ batch, onActivate, onCancel, onClose }: { batch: any, onAct
     customerAvail = liveStatus?.reduce((sum, i) => sum + i.customer_available, 0) || 0;
   }
 
+  const isStale = batch.status === 'active' && isBatchExpired(batch.inventory_date, batch.window_end);
+
   const getStatusColor = (status: string) => {
+    if (isStale) return Colors.error;
     switch (status) {
       case 'active': return Colors.success;
       case 'draft': return Colors.warning;
@@ -54,13 +57,13 @@ const BatchCard = ({ batch, onActivate, onCancel, onClose }: { batch: any, onAct
         <View>
           <Text style={styles.windowText}>
             {batch.window_start && batch.window_end 
-              ? `${new Date(batch.window_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(batch.window_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+              ? `${formatTimeSlot(batch.window_start)} - ${formatTimeSlot(batch.window_end)}`
               : 'Window Not Set'}
           </Text>
           <Text style={styles.itemCountText}>{itemCount} Items</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColor + '1A', borderColor: statusColor + '40' }]}>
-          <Text style={[styles.statusText, { color: statusColor }]}>{batch.status.toUpperCase()}</Text>
+          <Text style={[styles.statusText, { color: statusColor }]}>{isStale ? "STALE" : batch.status.toUpperCase()}</Text>
         </View>
       </View>
 

@@ -125,3 +125,51 @@ export function isExpiringSoon(endDateStr: string): boolean {
   return diffDays >= 0 && diffDays <= 3;
 }
 
+/**
+ * Safely format database TIME strings (like "12:00:00") or ISO timestamps into display strings (e.g. "12:00 PM").
+ * Avoids new Date() parsing of raw TIME strings.
+ */
+export function formatTimeSlot(timeString: string | null | undefined): string {
+  if (!timeString) return '';
+  const parts = timeString.split(':');
+  if (parts.length >= 2) {
+    let hour = parseInt(parts[0], 10);
+    const minute = parseInt(parts[1], 10);
+    if (!isNaN(hour) && !isNaN(minute)) {
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      hour = hour % 12;
+      hour = hour ? hour : 12; // 0 should be 12
+      const minStr = minute < 10 ? '0' + minute : minute;
+      return `${hour}:${minStr} ${ampm}`;
+    }
+  }
+  
+  // Fallback to normal Date parsing if it is a full timestamp
+  const date = new Date(timeString);
+  if (!isNaN(date.getTime())) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  
+  return timeString;
+}
+
+/**
+ * Client-side check to determine if an active batch is stale/expired (60-minute grace period).
+ */
+export function isBatchExpired(inventoryDate: string, windowEnd: string, graceMinutes = 60): boolean {
+  const todayKey = formatDateKey(getKitchenDate());
+  if (inventoryDate < todayKey) {
+    return true; // Past dates are expired
+  }
+  if (inventoryDate === todayKey) {
+    const [hours, minutes] = windowEnd.split(':').map(Number);
+    if (!isNaN(hours) && !isNaN(minutes)) {
+      const expirationDate = getKitchenDate();
+      expirationDate.setHours(hours, minutes, 0, 0);
+      expirationDate.setMinutes(expirationDate.getMinutes() + graceMinutes);
+      return new Date() > expirationDate;
+    }
+  }
+  return false; // Future batches or non-expired today batches
+}
+

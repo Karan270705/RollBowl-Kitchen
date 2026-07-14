@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, Alert } from 'react-native';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
@@ -112,16 +112,25 @@ export const CancelModal = ({ visible, onClose, batchId }: any) => {
   );
 };
 
-export const MovementModal = ({ visible, onClose, batchId, item }: any) => {
+export const MovementModal = ({ visible, onClose, batchId, item, mode }: any) => {
   const { mutateAsync: recordMovement, isPending } = useRecordMovement();
   const [type, setType] = useState('walk_in_sale');
   const [qtyStr, setQtyStr] = useState('1');
   const [note, setNote] = useState('');
 
+  // Keep type synchronized when mode changes
+  useEffect(() => {
+    if (visible) {
+      setType(mode === 'add' ? 'stock_added' : 'walk_in_sale');
+      setQtyStr('1');
+      setNote('');
+    }
+  }, [visible, mode]);
+
   if (!item) return null;
 
-  const maxAllowed = ['walk_in_sale', 'complimentary'].includes(type) ? item.extra_available :
-                     ['damaged', 'wasted', 'correction_decrease'].includes(type) ? item.remaining_physical : null;
+  // Protect reserved app orders for all normal manual outflows
+  const maxAllowed = mode === 'remove' ? item.extra_available : null;
 
   const handleRecord = async () => {
     const qty = parseInt(qtyStr, 10);
@@ -130,7 +139,7 @@ export const MovementModal = ({ visible, onClose, batchId, item }: any) => {
       return;
     }
     if (maxAllowed !== null && qty > maxAllowed) {
-      Alert.alert('Error', `Cannot exceed ${maxAllowed}.`);
+      Alert.alert('Error', `Cannot exceed ${maxAllowed} (reserved orders must be protected).`);
       return;
     }
 
@@ -143,15 +152,19 @@ export const MovementModal = ({ visible, onClose, batchId, item }: any) => {
     }
   };
 
+  const movementOptions = mode === 'add' 
+    ? ['stock_added', 'correction_increase'] 
+    : ['walk_in_sale', 'damaged', 'wasted', 'complimentary', 'correction_decrease'];
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Record Movement</Text>
+          <Text style={styles.modalTitle}>{mode === 'add' ? 'Add Stock' : 'Remove Stock'}</Text>
           <Text style={styles.modalSubTitle}>{item.item_name}</Text>
 
           <View style={styles.typeSelector}>
-             {['walk_in_sale', 'damaged', 'wasted', 'stock_added'].map(t => (
+             {movementOptions.map(t => (
                <Button 
                  key={t} 
                  title={t.replace(/_/g, ' ')} 
@@ -160,6 +173,16 @@ export const MovementModal = ({ visible, onClose, batchId, item }: any) => {
                  style={{ marginBottom: Spacing.xs }}
                />
              ))}
+             {mode === 'remove' && (
+               <Button
+                 title="Subscription walk-in redemption — coming soon"
+                 variant="outline"
+                 disabled
+                 style={{ marginBottom: Spacing.xs, opacity: 0.5, borderColor: Colors.border }}
+                 textStyle={{ color: Colors.textTertiary }}
+                 onPress={() => {}}
+               />
+             )}
           </View>
 
           <Input 
@@ -171,7 +194,7 @@ export const MovementModal = ({ visible, onClose, batchId, item }: any) => {
             style={{ marginBottom: Spacing.sm }} 
           />
           {maxAllowed !== null && (
-            <Text style={styles.hintText}>Max Allowed: {maxAllowed}</Text>
+            <Text style={styles.hintText}>Max Allowed (Available): {maxAllowed}</Text>
           )}
 
           <Input 

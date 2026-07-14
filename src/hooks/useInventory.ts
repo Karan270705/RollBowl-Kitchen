@@ -15,7 +15,8 @@ import {
   closeInventoryBatch,
   cancelInventoryBatch,
   recordInventoryMovement,
-  formatLocalDate
+  formatLocalDate,
+  LiveInventoryStatus
 } from '@/src/services/inventory';
 import { getPrimaryStallId } from '@/src/services/menu';
 
@@ -238,6 +239,12 @@ export const useLiveInventoryStatus = (batchId: string | undefined) => {
     
     channel.on(
       'postgres_changes',
+      { event: '*', schema: 'public', table: 'inventory_batches', filter: `id=eq.${batchId}` },
+      scheduleInvalidation
+    );
+    
+    channel.on(
+      'postgres_changes',
       { event: '*', schema: 'public', table: 'inventory_batch_items', filter: `inventory_batch_id=eq.${batchId}` },
       scheduleInvalidation
     );
@@ -245,6 +252,18 @@ export const useLiveInventoryStatus = (batchId: string | undefined) => {
     channel.on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'inventory_movements', filter: `inventory_batch_id=eq.${batchId}` },
+      scheduleInvalidation
+    );
+
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'orders' },
+      scheduleInvalidation
+    );
+
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'order_items' },
       scheduleInvalidation
     );
     
@@ -362,8 +381,24 @@ export const useRecordMovement = () => {
   return useMutation({
     mutationFn: (vars: { batchItemId: string, type: string, quantity: number, note?: string, batchId: string }) => 
       recordInventoryMovement(vars.batchItemId, vars.type, vars.quantity, vars.note),
-    onSuccess: (_, vars) => {
+    onSuccess: (updatedItem, vars) => {
+      if (updatedItem) {
+        queryClient.setQueryData<LiveInventoryStatus[]>(
+          ['live-inventory-status', vars.batchId],
+          (old) => {
+            if (!old) return [updatedItem];
+            return old.map(item => 
+              item.inventory_batch_item_id === updatedItem.inventory_batch_item_id 
+                ? updatedItem 
+                : item
+            );
+          }
+        );
+      }
       queryClient.invalidateQueries({ queryKey: ['live-inventory-status', vars.batchId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-batch', vars.batchId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-batch-items', vars.batchId] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-batches'] });
     }
   });
 };

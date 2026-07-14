@@ -10,7 +10,7 @@ import { getPrimaryStallId } from '@/src/services/menu';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
-import { formatDisplayDate } from '@/src/utils/helpers';
+import { formatDisplayDate, formatTimeSlot } from '@/src/utils/helpers';
 import { fetchPublishedMenuMeals } from '@/src/services/inventory';
 import { 
   useInventoryBatch, 
@@ -48,6 +48,8 @@ export default function InventoryBatchDetailScreen() {
   const [showCancel, setShowCancel] = useState(false);
   const [showMovement, setShowMovement] = useState(false);
   const [selectedMovementItem, setSelectedMovementItem] = useState<any>(null);
+  const [movementMode, setMovementMode] = useState<'add' | 'remove'>('remove');
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
 
   // Draft Edit State
   const [windowStart, setWindowStart] = useState<Date>(new Date());
@@ -154,7 +156,7 @@ export default function InventoryBatchDetailScreen() {
   const hasInvalidItems = invalidItems.length > 0;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + Spacing.base, paddingBottom: insets.bottom || Spacing.base }]}>
+    <View key={batchId} style={[styles.container, { paddingTop: insets.top + Spacing.base, paddingBottom: insets.bottom || Spacing.base }]}>
       <View style={styles.header}>
         <Button variant="ghost" title="Back" onPress={() => router.back()} style={styles.backBtn as any} />
         <View>
@@ -179,7 +181,7 @@ export default function InventoryBatchDetailScreen() {
             </View>
           ) : (
             <Text style={styles.valueText}>
-              {new Date(batch.window_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(batch.window_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {formatTimeSlot(batch.window_start)} - {formatTimeSlot(batch.window_end)}
             </Text>
           )}
         </Card>
@@ -224,47 +226,99 @@ export default function InventoryBatchDetailScreen() {
               )}
             </>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View>
-                <View style={styles.gridHeaderRow}>
-                  <Text style={[styles.gridCell, styles.gridHeaderCell, { width: 120 }]}>Item</Text>
-                  <Text style={[styles.gridCell, styles.gridHeaderCell]}>Loaded</Text>
-                  <Text style={[styles.gridCell, styles.gridHeaderCell]}>Added</Text>
-                  <Text style={[styles.gridCell, styles.gridHeaderCell]}>Reserved</Text>
-                  <Text style={[styles.gridCell, styles.gridHeaderCell]}>Fulfilled</Text>
-                  <Text style={[styles.gridCell, styles.gridHeaderCell]}>Physical</Text>
-                  <Text style={[styles.gridCell, styles.gridHeaderCell]}>Extra</Text>
-                  <Text style={[styles.gridCell, styles.gridHeaderCell]}>Customer</Text>
-                  {isActive && <Text style={[styles.gridCell, styles.gridHeaderCell]}>Actions</Text>}
-                </View>
-                {liveStatus?.map(ls => (
-                  <View key={ls.inventory_batch_item_id} style={styles.gridRow}>
-                    <Text style={[styles.gridCell, { width: 120 }]} numberOfLines={1}>{ls.item_name}</Text>
-                    <Text style={styles.gridCell}>{ls.loaded_quantity}</Text>
-                    <Text style={styles.gridCell}>{ls.manual_inflow}</Text>
-                    <Text style={styles.gridCell}>{ls.active_reserved}</Text>
-                    <Text style={styles.gridCell}>{ls.fulfilled}</Text>
-                    <Text style={[styles.gridCell, { fontFamily: Typography.family.bold }]}>{ls.remaining_physical}</Text>
-                    <Text style={styles.gridCell}>{ls.extra_available}</Text>
-                    <Text style={styles.gridCell}>{ls.customer_available}</Text>
+            <View style={{ gap: Spacing.md }}>
+              {liveStatus?.map(ls => {
+                const isExpanded = expandedItems[ls.inventory_batch_item_id];
+                
+                // Determine stock status details
+                let statusLabel = 'In Stock';
+                let statusColor = Colors.success;
+                if (ls.customer_available === 0) {
+                  statusLabel = 'Sold Out';
+                  statusColor = Colors.error;
+                } else if (ls.customer_available <= 5) {
+                  statusLabel = 'Low Stock';
+                  statusColor = Colors.warning;
+                }
+
+                return (
+                  <Card key={ls.inventory_batch_item_id} style={styles.itemCard}>
+                    <View style={styles.cardHeader}>
+                      <Text style={styles.cardMealName}>{ls.item_name}</Text>
+                      <View style={[styles.statusBadge, { backgroundColor: statusColor + '1A', borderColor: statusColor + '40' }]}>
+                        <Text style={[styles.statusText, { color: statusColor }]}>
+                          {statusLabel.toUpperCase()}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.cardStatsRow}>
+                      <View style={styles.cardStatCol}>
+                        <Text style={styles.cardStatVal}>{ls.remaining_physical}</Text>
+                        <Text style={styles.cardStatLbl}>Remaining</Text>
+                      </View>
+                      <View style={styles.cardStatCol}>
+                        <Text style={styles.cardStatVal}>{ls.active_reserved}</Text>
+                        <Text style={styles.cardStatLbl}>Reserved</Text>
+                      </View>
+                      <View style={styles.cardStatCol}>
+                        <Text style={[styles.cardStatVal, { color: Colors.primary }]}>{ls.customer_available}</Text>
+                        <Text style={styles.cardStatLbl}>Available</Text>
+                      </View>
+                    </View>
+
                     {isActive && (
-                      <View style={[styles.gridCell, { justifyContent: 'center' }]}>
+                      <View style={styles.cardActions}>
                         <Button 
-                          title="Record" 
+                          title="Remove Stock" 
                           variant="outline" 
                           onPress={() => {
                             setSelectedMovementItem(ls);
+                            setMovementMode('remove');
                             setShowMovement(true);
                           }} 
-                          style={{ paddingHorizontal: Spacing.sm, paddingVertical: 4, height: 'auto' }}
-                          textStyle={{ fontSize: Typography.size.xs }}
+                          style={styles.cardBtn}
+                          textStyle={{ fontSize: Typography.size.sm }}
+                        />
+                        <Button 
+                          title="Add Stock" 
+                          variant="outline" 
+                          onPress={() => {
+                            setSelectedMovementItem(ls);
+                            setMovementMode('add');
+                            setShowMovement(true);
+                          }} 
+                          style={styles.cardBtn}
+                          textStyle={{ fontSize: Typography.size.sm }}
                         />
                       </View>
                     )}
-                  </View>
-                ))}
-              </View>
-            </ScrollView>
+
+                    {/* Expandable Details Section */}
+                    <TouchableOpacity 
+                      style={styles.detailsToggle} 
+                      onPress={() => setExpandedItems(prev => ({ ...prev, [ls.inventory_batch_item_id]: !prev[ls.inventory_batch_item_id] }))}
+                    >
+                      <Text style={styles.detailsToggleText}>
+                        {isExpanded ? "Hide Details" : "View Details"}
+                      </Text>
+                      <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.primary} />
+                    </TouchableOpacity>
+
+                    {isExpanded && (
+                      <View style={styles.detailsContainer}>
+                        <View style={styles.detailRow}><Text style={styles.detailLabel}>Initial Loaded</Text><Text style={styles.detailValue}>{ls.loaded_quantity}</Text></View>
+                        <View style={styles.detailRow}><Text style={styles.detailLabel}>Manual Additions (Inflows)</Text><Text style={styles.detailValue}>{ls.manual_inflow}</Text></View>
+                        <View style={styles.detailRow}><Text style={styles.detailLabel}>Manual Reductions (Outflows)</Text><Text style={styles.detailValue}>{ls.manual_outflow}</Text></View>
+                        <View style={styles.detailRow}><Text style={styles.detailLabel}>App Order Reservations</Text><Text style={styles.detailValue}>{ls.active_reserved}</Text></View>
+                        <View style={styles.detailRow}><Text style={styles.detailLabel}>Fulfilled App Orders</Text><Text style={styles.detailValue}>{ls.fulfilled}</Text></View>
+                        <View style={styles.detailRow}><Text style={styles.detailLabel}>Cancelled App Orders</Text><Text style={styles.detailValue}>{ls.cancelled}</Text></View>
+                      </View>
+                    )}
+                  </Card>
+                );
+              })}
+            </View>
           )}
         </Card>
       </ScrollView>
@@ -306,12 +360,18 @@ export default function InventoryBatchDetailScreen() {
         onClose={() => setShowActivation(false)} 
         batchId={batchId} 
         items={items} 
-        windowStr={`${windowStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${windowEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+        windowStr={`${formatTimeSlot(batch.window_start)} - ${formatTimeSlot(batch.window_end)}`}
         dateStr={formatDisplayDate(new Date(batch.inventory_date))}
       />
       <CloseModal visible={showClose} onClose={() => setShowClose(false)} batchId={batchId} />
       <CancelModal visible={showCancel} onClose={() => setShowCancel(false)} batchId={batchId} />
-      <MovementModal visible={showMovement} onClose={() => setShowMovement(false)} batchId={batchId} item={selectedMovementItem} />
+      <MovementModal 
+        visible={showMovement} 
+        onClose={() => setShowMovement(false)} 
+        batchId={batchId} 
+        item={selectedMovementItem} 
+        mode={movementMode}
+      />
     </View>
   );
 }
@@ -337,10 +397,6 @@ const styles = StyleSheet.create({
   mealSelector: { marginTop: Spacing.md, padding: Spacing.base, backgroundColor: Colors.surface, borderRadius: Radii.md, borderWidth: 1, borderColor: Colors.border },
   mealOption: { paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
   mealOptionText: { fontFamily: Typography.family.medium, fontSize: Typography.size.base, color: Colors.primary },
-  gridHeaderRow: { flexDirection: 'row', borderBottomWidth: 2, borderBottomColor: Colors.border, paddingBottom: Spacing.xs, marginBottom: Spacing.xs },
-  gridRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border, paddingVertical: Spacing.xs, alignItems: 'center' },
-  gridCell: { width: 80, fontFamily: Typography.family.regular, fontSize: Typography.size.sm, color: Colors.textPrimary, textAlign: 'center' },
-  gridHeaderCell: { fontFamily: Typography.family.bold, color: Colors.textSecondary },
   footer: { padding: Spacing.base, backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.border },
   actionRow: { flexDirection: 'row', gap: Spacing.sm },
   flexBtn: { flex: 1 },
@@ -348,5 +404,31 @@ const styles = StyleSheet.create({
   warningText: { color: '#664d03', fontFamily: Typography.family.medium, fontSize: Typography.size.sm },
   invalidMealRow: { backgroundColor: '#fff5f5' },
   invalidMealText: { color: Colors.error },
-  invalidMealSubText: { color: Colors.error, fontSize: Typography.size.xs, fontFamily: Typography.family.regular }
+  invalidMealSubText: { color: Colors.error, fontSize: Typography.size.xs, fontFamily: Typography.family.regular },
+  itemCard: { marginBottom: Spacing.md, padding: Spacing.base },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.base },
+  cardMealName: { fontFamily: Typography.family.bold, fontSize: Typography.size.base, color: Colors.textPrimary },
+  cardStatsRow: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: Colors.background, paddingVertical: Spacing.sm, borderRadius: Radii.sm, marginBottom: Spacing.md },
+  cardStatCol: { alignItems: 'center' },
+  cardStatVal: { fontFamily: Typography.family.bold, fontSize: Typography.size.base, color: Colors.textPrimary },
+  cardStatLbl: { fontFamily: Typography.family.medium, fontSize: Typography.size.xs, color: Colors.textTertiary, marginTop: 2 },
+  cardActions: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
+  cardBtn: { flex: 1, height: 40 },
+  detailsToggle: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: Spacing.xs, paddingVertical: Spacing.xs },
+  detailsToggleText: { fontFamily: Typography.family.medium, fontSize: Typography.size.sm, color: Colors.primary },
+  detailsContainer: { marginTop: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: Spacing.sm },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  detailLabel: { fontFamily: Typography.family.regular, fontSize: Typography.size.sm, color: Colors.textSecondary },
+  detailValue: { fontFamily: Typography.family.semiBold, fontSize: Typography.size.sm, color: Colors.textPrimary },
+  statusBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: Radii.full,
+    borderWidth: 1,
+  },
+  statusText: {
+    fontFamily: Typography.family.bold,
+    fontSize: Typography.size.xs,
+  }
 });
+
