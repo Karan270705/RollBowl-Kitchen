@@ -6,12 +6,12 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
   ActivityIndicator,
   TextInput,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
 import {
@@ -220,7 +220,7 @@ export const PaymentProofViewerModal: React.FC<PaymentProofViewerModalProps> = (
               <Image
                 source={{ uri: signedUrlData.signedUrl }}
                 style={styles.screenshot}
-                resizeMode="contain"
+                contentFit="contain"
                 onError={() => setImageError(true)}
               />
             ) : (

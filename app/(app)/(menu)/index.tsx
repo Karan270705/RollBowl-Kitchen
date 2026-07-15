@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { CalendarStrip } from '@/src/components/ui/CalendarStrip';
@@ -14,6 +15,7 @@ import {
   useRemoveMealFromMenu,
   useCopyMenu,
 } from '@/src/hooks/useMenu';
+import { enableMeal } from '@/src/services/menu';
 import { useHolidayForDate } from '@/src/hooks/useHolidays';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -23,6 +25,7 @@ export default function MenuScreen() {
     formatDateKey(getOperationalContext().operationalDate)
   );
   const [modalVisible, setModalVisible] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: holidayData } = useHolidayForDate(selectedDateStr);
 
@@ -42,7 +45,32 @@ export default function MenuScreen() {
   
   const currentItemIds = items.map((i) => i.mealId);
 
-  const handleSaveMeals = (mealIds: string[]) => {
+  const handleSaveMeals = async (mealIds: string[]) => {
+    const unavailableSelected = mealsPool.filter(m => mealIds.includes(m.id) && !m.isAvailable);
+    if (unavailableSelected.length > 0) {
+      const names = unavailableSelected.map(m => m.name).join(', ');
+      Alert.alert(
+        'Unavailable Meals Selected',
+        `${names} is currently disabled in the catalogue. Enable it before publishing.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Enable and Publish', 
+            onPress: async () => {
+              try {
+                for (const m of unavailableSelected) {
+                  await enableMeal(m.id);
+                }
+                saveMeals({ scheduleId: schedule?.id || null, mealIds });
+              } catch (e: any) {
+                Alert.alert('Error', e.message);
+              }
+            } 
+          }
+        ]
+      );
+      return;
+    }
     saveMeals({ scheduleId: schedule?.id || null, mealIds });
   };
 
@@ -60,6 +88,17 @@ export default function MenuScreen() {
       ]);
     } else {
       removeMeal({ scheduleId: schedule.id, mealId });
+    }
+  };
+
+  const handleEnableMeal = async (mealId: string) => {
+    try {
+      await enableMeal(mealId);
+      Alert.alert('Success', 'Meal enabled successfully.');
+      queryClient.invalidateQueries({ queryKey: ['mealsPool'] });
+      queryClient.invalidateQueries({ queryKey: ['menu', selectedDateStr] });
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
     }
   };
 
@@ -151,6 +190,7 @@ export default function MenuScreen() {
                 key={item.id}
                 item={item}
                 onRemove={handleRemoveMeal}
+                onEnable={handleEnableMeal}
                 isLocked={isLocked}
               />
             ))

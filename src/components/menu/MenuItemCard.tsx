@@ -7,32 +7,52 @@ import { MenuScheduleItem } from '@/src/types/models';
 interface MenuItemCardProps {
   item: MenuScheduleItem;
   onRemove: (mealId: string) => void;
+  onEnable?: (mealId: string) => void;
   isLocked?: boolean;
 }
 
-export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onRemove, isLocked = false }) => {
+export const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onRemove, onEnable, isLocked = false }) => {
   const { meal } = item;
 
   if (!meal) return null;
 
+  const isUnavailable = !meal.isAvailable;
+
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isUnavailable && styles.cardUnavailable]}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.name}>{meal.name}</Text>
-          <Text style={styles.price}>₹{meal.price}</Text>
+          <Text style={[styles.name, isUnavailable && styles.textDimmed]}>{meal.name}</Text>
+          <View style={styles.rightHeader}>
+            {isUnavailable && (
+              <View style={styles.unavailableBadge}>
+                <Text style={styles.unavailableBadgeText}>UNAVAILABLE</Text>
+              </View>
+            )}
+            <Text style={[styles.price, isUnavailable && styles.textDimmed]}>₹{meal.price}</Text>
+          </View>
         </View>
-        <Text style={styles.category}>{meal.category.toUpperCase()}</Text>
-        {!isLocked && (
+        <Text style={[styles.category, isUnavailable && styles.textDimmed]}>{meal.category.toUpperCase()}</Text>
+        {(!isLocked || isUnavailable) && (
           <View style={styles.footer}>
+            {isUnavailable && onEnable && (
+              <TouchableOpacity 
+                style={styles.enableBtn}
+                onPress={() => onEnable(meal.id)}
+              >
+                <Text style={styles.enableText}>Enable Meal</Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.spacer} />
-            <TouchableOpacity 
-              style={styles.removeBtn}
-              onPress={() => onRemove(meal.id)}
-            >
-              <Ionicons name="trash-outline" size={16} color={Colors.error} />
-              <Text style={styles.removeText}>Remove</Text>
-            </TouchableOpacity>
+            {!isLocked && (
+              <TouchableOpacity 
+                style={styles.removeBtn}
+                onPress={() => onRemove(meal.id)}
+              >
+                <Ionicons name="trash-outline" size={16} color={Colors.error} />
+                <Text style={styles.removeText}>Remove</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -100,4 +120,39 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.xs,
     color: Colors.error,
   },
+  cardUnavailable: {
+    backgroundColor: Colors.background,
+    borderColor: Colors.border,
+    opacity: 0.8,
+  },
+  textDimmed: {
+    color: Colors.textSecondary,
+  },
+  rightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
+  unavailableBadge: {
+    backgroundColor: Colors.errorMuted,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: Radii.sm,
+  },
+  unavailableBadgeText: {
+    color: Colors.error,
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.bold,
+  },
+  enableBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: Radii.sm,
+    backgroundColor: Colors.primaryMuted,
+  },
+  enableText: {
+    color: Colors.primary,
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.semiBold,
+  }
 });

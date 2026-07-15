@@ -16,6 +16,13 @@ export const AppConfig = {
   // e.g., 4 means a new kitchen day starts at 4:00 AM.
   DAY_ROLLOVER_HOUR: 4,
 
+  // Business Operations
+  BUSINESS: {
+    PICKUP_START_TIME: '12:00', // 24h format HH:mm
+    PICKUP_END_TIME: '14:00',
+    ORDER_CUTOFF_TIME: '10:00',
+  },
+
   // Allowed roles for this app
   ALLOWED_ROLES: ['kitchen', 'stall_operator'] as const,
 } as const;

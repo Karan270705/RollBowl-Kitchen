@@ -1,4 +1,5 @@
 import { supabase } from '@/src/lib/supabase';
+import { AppConfig } from '@/src/constants/config';
 
 // Helper to get today's date string in IST
 export function getTodayISTDateString(): string {
@@ -150,17 +151,65 @@ export async function resolveSharedOperationalDate(stallId?: string): Promise<Op
   }
   
   if (nextDate) {
-    return defaultResult(nextDate, 'Next scheduled menu/batch date found', 'ORDERING_CLOSED');
+    const cutoffIST = parseTimeToDateIST(nextDate, AppConfig.BUSINESS.ORDER_CUTOFF_TIME);
+    const pickupStartIST = parseTimeToDateIST(nextDate, AppConfig.BUSINESS.PICKUP_START_TIME);
+    
+    const canOrder = currentIST <= cutoffIST;
+    const isPrepTime = currentIST > cutoffIST && currentIST < pickupStartIST;
+    const phase = canOrder ? 'ORDERING_OPEN' : 'ORDERING_CLOSED';
+
+    console.log('[DevLog] resolveSharedOperationalDate', JSON.stringify({
+      nowIST: currentIST,
+      resolvedOperationalDate: nextDate,
+      cutoffIST,
+      status: phase,
+      isPrepTime,
+      canOrder
+    }, null, 2));
+
+    return defaultResult(nextDate, 'Next scheduled menu/batch date found', phase);
   }
 
-  // 6. Fallback logic: roll over to tomorrow if past 14:00
-  const fallbackCutoff = parseTimeToDateIST(calendarDate, '14:00:00');
+  // 6. Fallback logic: roll over to tomorrow if past fallback cutoff
+  const fallbackCutoff = parseTimeToDateIST(calendarDate, AppConfig.BUSINESS.ORDER_CUTOFF_TIME);
   if (currentIST > fallbackCutoff) {
     const tomorrow = new Date(currentIST);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-    return defaultResult(tomorrowStr, 'Past 14:00 fallback', 'ORDERING_CLOSED');
+    
+    const tomorrowCutoffIST = parseTimeToDateIST(tomorrowStr, AppConfig.BUSINESS.ORDER_CUTOFF_TIME);
+    const tomorrowPickupStartIST = parseTimeToDateIST(tomorrowStr, AppConfig.BUSINESS.PICKUP_START_TIME);
+    
+    const canOrder = currentIST <= tomorrowCutoffIST;
+    const isPrepTime = currentIST > tomorrowCutoffIST && currentIST < tomorrowPickupStartIST;
+    const phase = canOrder ? 'ORDERING_OPEN' : 'ORDERING_CLOSED';
+
+    console.log('[DevLog] resolveSharedOperationalDate fallback', JSON.stringify({
+      nowIST: currentIST,
+      resolvedOperationalDate: tomorrowStr,
+      cutoffIST: tomorrowCutoffIST,
+      status: phase,
+      isPrepTime,
+      canOrder
+    }, null, 2));
+
+    return defaultResult(tomorrowStr, 'Past cutoff fallback', phase);
   }
 
-  return defaultResult(calendarDate, 'Before 14:00 fallback', 'ORDERING_CLOSED');
+  const todayCutoffIST = parseTimeToDateIST(calendarDate, AppConfig.BUSINESS.ORDER_CUTOFF_TIME);
+  const todayPickupStartIST = parseTimeToDateIST(calendarDate, AppConfig.BUSINESS.PICKUP_START_TIME);
+  const canOrderToday = currentIST <= todayCutoffIST;
+  const isPrepTimeToday = currentIST > todayCutoffIST && currentIST < todayPickupStartIST;
+  const phaseToday = canOrderToday ? 'ORDERING_OPEN' : 'ORDERING_CLOSED';
+
+  console.log('[DevLog] resolveSharedOperationalDate today', JSON.stringify({
+    nowIST: currentIST,
+    resolvedOperationalDate: calendarDate,
+    cutoffIST: todayCutoffIST,
+    status: phaseToday,
+    isPrepTime: isPrepTimeToday,
+    canOrder: canOrderToday
+  }, null, 2));
+
+  return defaultResult(calendarDate, 'Before cutoff fallback', phaseToday);
 }

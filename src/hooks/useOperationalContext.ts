@@ -4,8 +4,15 @@ import { resolveSharedOperationalDate, OperationalContextResult, DEFAULT_RESOLVI
 export function useOperationalContext(stallId?: string): OperationalContextResult {
   const { data } = useQuery({
     queryKey: ['operational-context', stallId],
-    queryFn: () => resolveSharedOperationalDate(stallId),
-    enabled: !!stallId,
+    queryFn: async () => {
+      let actualStallId = stallId;
+      if (!actualStallId) {
+        const { getPrimaryStallId } = await import('../services/menu');
+        actualStallId = await getPrimaryStallId();
+      }
+      return resolveSharedOperationalDate(actualStallId);
+    },
+    enabled: true,
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: 2,
   });

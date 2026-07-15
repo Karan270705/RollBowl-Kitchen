@@ -67,7 +67,9 @@ export const MealSelectionModal: React.FC<MealSelectionModalProps> = ({
                 activeOpacity={0.7}
               >
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemName}>{meal.name}</Text>
+                  <Text style={[styles.itemName, !meal.isAvailable && { color: Colors.textSecondary }]}>
+                    {meal.name} {!meal.isAvailable && '(Unavailable)'}
+                  </Text>
                   <Text style={styles.itemCategory}>{meal.category.toUpperCase()}</Text>
                 </View>
                 <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>

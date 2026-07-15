@@ -11,7 +11,10 @@ import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
 import { Card } from '@/src/components/ui/Card';
 import { formatDisplayDate, formatTimeSlot } from '@/src/utils/helpers';
+import { parseTimeToDateIST } from '@/src/utils/operationalDate';
 import { fetchPublishedMenuMeals } from '@/src/services/inventory';
+import { enableMeal, removeMealFromMenu } from '@/src/services/menu';
+import { useQueryClient } from '@tanstack/react-query';
 import { 
   useInventoryBatch, 
   useInventoryBatchItems, 
@@ -40,7 +43,11 @@ export default function InventoryBatchDetailScreen() {
   const { mutateAsync: addDraftItem } = useAddDraftItem();
 
   const [stallId, setStallId] = useState<string>();
+  const [scheduleId, setScheduleId] = useState<string | undefined>();
   const [availableMeals, setAvailableMeals] = useState<any[]>([]);
+  const [isMealsLoading, setIsMealsLoading] = useState(false);
+  const [mealsError, setMealsError] = useState(false);
+  const queryClient = useQueryClient();
 
   // Modals
   const [showActivation, setShowActivation] = useState(false);
@@ -69,15 +76,32 @@ export default function InventoryBatchDetailScreen() {
 
   useEffect(() => {
     if (batch && batch.status === 'draft') {
-      setWindowStart(new Date(batch.window_start));
-      setWindowEnd(new Date(batch.window_end));
+      const start = parseTimeToDateIST(batch.inventory_date, batch.window_start);
+      let end = parseTimeToDateIST(batch.inventory_date, batch.window_end);
+      
+      // Handle overnight windows
+      if (end < start) {
+        end.setDate(end.getDate() + 1);
+      }
+      
+      setWindowStart(start);
+      setWindowEnd(end);
     }
   }, [batch]);
 
   const fetchMeals = async (sid: string) => {
     if (!batch) return;
-    const { meals } = await fetchPublishedMenuMeals(sid, batch.inventory_date);
-    setAvailableMeals(meals);
+    setIsMealsLoading(true);
+    setMealsError(false);
+    try {
+      const { scheduleId: sid2, meals } = await fetchPublishedMenuMeals(sid, batch.inventory_date);
+      setAvailableMeals(meals);
+      setScheduleId(sid2);
+    } catch (e) {
+      setMealsError(true);
+    } finally {
+      setIsMealsLoading(false);
+    }
   };
 
   const verifyDraftStatus = async (): Promise<boolean> => {
@@ -144,6 +168,39 @@ export default function InventoryBatchDetailScreen() {
     }
   };
 
+  const handleEnableMeal = async (mealId: string, mealName: string) => {
+    try {
+      await enableMeal(mealId);
+      Alert.alert('Success', `${mealName} enabled.`);
+      queryClient.invalidateQueries({ queryKey: ['mealsPool'] });
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
+      if (stallId) await fetchMeals(stallId);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const handleRemoveFromMenu = (mealId: string) => {
+    Alert.alert('Remove Item', 'Are you sure you want to remove this item from the published menu?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          if (!scheduleId) return;
+          try {
+            await removeMealFromMenu(scheduleId, mealId);
+            Alert.alert('Success', 'Meal removed from published menu.');
+            queryClient.invalidateQueries({ queryKey: ['menu'] });
+            if (stallId) await fetchMeals(stallId);
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        },
+      },
+    ]);
+  };
+
   if (isBatchLoading) return <ActivityIndicator style={{ flex: 1 }} />;
   if (!batch) return <View style={styles.container}><Text>Batch not found.</Text></View>;
 
@@ -153,7 +210,9 @@ export default function InventoryBatchDetailScreen() {
 
   // Cross reference draft items
   const invalidItems = items?.filter(item => !availableMeals.some(m => m.id === item.meal_id)) || [];
+  const unresolvedMeals = availableMeals.filter(m => !m.is_available);
   const hasInvalidItems = invalidItems.length > 0;
+  const hasUnresolvedMeals = unresolvedMeals.length > 0;
 
   return (
     <View key={batchId} style={[styles.container, { paddingTop: insets.top + Spacing.base, paddingBottom: insets.bottom || Spacing.base }]}>
@@ -193,35 +252,119 @@ export default function InventoryBatchDetailScreen() {
               <Text style={styles.warningText}>Warning: Some items in this draft are no longer in the published menu.</Text>
             </View>
           )}
+          {isDraft && hasUnresolvedMeals && (
+            <View style={[styles.warningBox, { backgroundColor: '#fff5f5', borderColor: Colors.error }]}>
+              <Text style={[styles.warningText, { color: Colors.error }]}>Warning: Activation blocked. {hasUnresolvedMeals} published meal(s) are unavailable.</Text>
+            </View>
+          )}
           {isDraft ? (
             <>
               {items?.map(item => {
-                const isInvalid = !availableMeals.some(m => m.id === item.meal_id);
+                const mealObj = availableMeals.find(m => m.id === item.meal_id);
+                const isInvalid = !mealObj;
+                const isUnavailable = mealObj && !mealObj.is_available;
+                
                 return (
-                  <View key={item.id} style={[styles.mealRow, isInvalid && styles.invalidMealRow]}>
+                  <View key={item.id} style={[styles.mealRow, (isInvalid || isUnavailable) && styles.invalidMealRow]}>
                     <View style={styles.mealInfo}>
-                      <Text style={[styles.mealName, isInvalid && styles.invalidMealText]}>{item.meals?.name}</Text>
+                      <Text style={[styles.mealName, (isInvalid || isUnavailable) && styles.invalidMealText]}>
+                        {item.meals?.name} {isUnavailable ? '— unavailable' : ''}
+                      </Text>
                       {isInvalid && <Text style={styles.invalidMealSubText}>Not in published menu</Text>}
+                      {isUnavailable && (
+                        <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs }}>
+                          <TouchableOpacity onPress={() => handleEnableMeal(item.meal_id, item.meals?.name || 'Meal')}>
+                             <Text style={styles.enableActionText}>Enable Meal</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleRemoveFromMenu(item.meal_id)}>
+                             <Text style={[styles.enableActionText, { color: Colors.error }]}>Remove from Published Menu</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                     </View>
                     <View style={styles.stepper}>
-                      <Button variant="outline" title="-" onPress={() => handleUpdateItemQty(item.id, item.loaded_quantity - 1)} style={styles.stepBtn as any} />
+                      <Button variant="outline" title="-" onPress={() => handleUpdateItemQty(item.id, item.loaded_quantity - 1)} disabled={isUnavailable} style={styles.stepBtn as any} />
                       <Text style={styles.qtyText}>{item.loaded_quantity}</Text>
-                      <Button variant="outline" title="+" onPress={() => handleUpdateItemQty(item.id, item.loaded_quantity + 1)} style={styles.stepBtn as any} />
+                      <Button variant="outline" title="+" onPress={() => handleUpdateItemQty(item.id, item.loaded_quantity + 1)} disabled={isUnavailable} style={styles.stepBtn as any} />
                     </View>
                   </View>
                 );
               })}
+
+              {hasUnresolvedMeals && (
+                <View style={{ marginTop: Spacing.xl }}>
+                  <Text style={[styles.sectionTitle, { color: Colors.error }]}>Unresolved Published Meals</Text>
+                  {unresolvedMeals.map(meal => (
+                    <View key={meal.id} style={[styles.mealRow, styles.invalidMealRow]}>
+                      <View style={styles.mealInfo}>
+                        <Text style={[styles.mealName, {color: Colors.error}]}>
+                          {meal.name}
+                        </Text>
+                        <Text style={styles.mealCategory}>{meal.category}</Text>
+                        <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
+                          <Button 
+                            title="Enable Meal" 
+                            variant="primary" 
+                            onPress={() => handleEnableMeal(meal.id, meal.name)} 
+                            style={{ paddingHorizontal: 12, paddingVertical: 6, minHeight: 0 } as any}
+                            textStyle={{ fontSize: 12 }}
+                          />
+                          <Button 
+                            title="Remove from Menu" 
+                            variant="outline" 
+                            onPress={() => handleRemoveFromMenu(meal.id)}
+                            style={{ paddingHorizontal: 12, paddingVertical: 6, minHeight: 0, borderColor: Colors.error } as any}
+                            textStyle={{ fontSize: 12, color: Colors.error }}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
               {!showAddMealSelector ? (
                 <Button title="+ Add Meal" variant="outline" onPress={() => setShowAddMealSelector(true)} style={{ marginTop: Spacing.md }} />
               ) : (
                 <View style={styles.mealSelector}>
                   <Text style={styles.label}>Select Meal:</Text>
-                  {availableMeals.filter(m => !items?.some(i => i.meal_id === m.id)).map(meal => (
-                    <TouchableOpacity key={meal.id} style={styles.mealOption} onPress={() => handleAddMeal(meal.id)}>
-                      <Text style={styles.mealOptionText}>{meal.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                  <Button title="Cancel" variant="ghost" onPress={() => setShowAddMealSelector(false)} />
+                  {isMealsLoading ? (
+                    <Text style={styles.infoText}>Loading meals...</Text>
+                  ) : mealsError ? (
+                    <Text style={styles.errorText}>Failed to load meals</Text>
+                  ) : availableMeals.filter(m => !items?.some(i => i.meal_id === m.id)).length === 0 ? (
+                    <Text style={styles.infoText}>No additional eligible meals</Text>
+                  ) : (
+                    <>
+                      {/* Eligible Published Meals */}
+                      {availableMeals.filter(m => !items?.some(i => i.meal_id === m.id) && m.is_available).map(meal => (
+                        <View key={meal.id} style={styles.mealOptionContainer}>
+                          <TouchableOpacity 
+                            style={[styles.mealOption, { flex: 1 }]} 
+                            onPress={() => handleAddMeal(meal.id)}
+                          >
+                            <Text style={styles.mealOptionText}>{meal.name}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+
+                      {/* Published but unavailable meals */}
+                      {availableMeals.filter(m => !items?.some(i => i.meal_id === m.id) && !m.is_available).map(meal => (
+                        <View key={meal.id} style={styles.mealOptionContainer}>
+                          <TouchableOpacity 
+                            style={[styles.mealOption, { opacity: 0.5, flex: 1 }]} 
+                            disabled={true}
+                          >
+                            <Text style={styles.mealOptionText}>{meal.name} — Enable meal</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.enableBtn} onPress={() => handleEnableMeal(meal.id, meal.name)}>
+                            <Text style={styles.enableActionText}>Enable</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </>
+                  )}
+                  <Button title="Cancel" variant="ghost" onPress={() => setShowAddMealSelector(false)} style={{ marginTop: Spacing.sm }} />
                 </View>
               )}
             </>
@@ -328,7 +471,7 @@ export default function InventoryBatchDetailScreen() {
           {isDraft && (
             <View style={styles.actionRow}>
               <Button title="Cancel Batch" variant="outline" onPress={() => setShowCancel(true)} style={[styles.flexBtn, { borderColor: Colors.error }] as any} textStyle={{ color: Colors.error }} />
-              <Button title="Activate Batch" onPress={() => setShowActivation(true)} style={styles.flexBtn} disabled={hasInvalidItems} />
+              <Button title="Activate Batch" onPress={() => setShowActivation(true)} style={styles.flexBtn} disabled={hasInvalidItems || hasUnresolvedMeals} />
             </View>
           )}
           {isActive && (
@@ -391,6 +534,7 @@ const styles = StyleSheet.create({
   mealRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.sm, borderBottomWidth: 1, borderBottomColor: Colors.border },
   mealInfo: { flex: 1 },
   mealName: { fontFamily: Typography.family.semiBold, fontSize: Typography.size.base, color: Colors.textPrimary },
+  mealCategory: { fontFamily: Typography.family.regular, fontSize: Typography.size.sm, color: Colors.textTertiary, textTransform: 'capitalize' },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   stepBtn: { width: 36, height: 36, paddingHorizontal: 0, paddingVertical: 0 },
   qtyText: { fontFamily: Typography.family.bold, fontSize: Typography.size.lg, color: Colors.textPrimary, minWidth: 24, textAlign: 'center' },
@@ -405,6 +549,11 @@ const styles = StyleSheet.create({
   invalidMealRow: { backgroundColor: '#fff5f5' },
   invalidMealText: { color: Colors.error },
   invalidMealSubText: { color: Colors.error, fontSize: Typography.size.xs, fontFamily: Typography.family.regular },
+  enableActionText: { color: Colors.primary, fontSize: Typography.size.sm, fontFamily: Typography.family.bold, marginTop: Spacing.xs },
+  mealOptionContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: Colors.border },
+  enableBtn: { padding: Spacing.sm },
+  infoText: { fontFamily: Typography.family.medium, fontSize: Typography.size.sm, color: Colors.textSecondary, fontStyle: 'italic', marginVertical: Spacing.sm },
+  errorText: { fontFamily: Typography.family.medium, fontSize: Typography.size.sm, color: Colors.error, marginVertical: Spacing.sm },
   itemCard: { marginBottom: Spacing.md, padding: Spacing.base },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.base },
   cardMealName: { flex: 1, flexWrap: 'wrap', marginRight: Spacing.sm, fontFamily: Typography.family.bold, fontSize: Typography.size.base, color: Colors.textPrimary },

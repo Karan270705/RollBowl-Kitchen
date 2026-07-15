@@ -170,7 +170,7 @@ export function formatLocalDate(date: Date | string): string {
   return `${year}-${month}-${day}`;
 }
 
-export async function fetchPublishedMenuMeals(stallId: string, date: string): Promise<{ hasPublishedMenu: boolean, meals: any[] }> {
+export async function fetchPublishedMenuMeals(stallId: string, date: string): Promise<{ hasPublishedMenu: boolean, scheduleId?: string, meals: (any & { is_available: boolean })[] }> {
   // First, check if a published schedule exists for this date and stall
   const { data: scheduleData, error: scheduleError } = await supabase
     .from('menu_schedules')
@@ -211,16 +211,15 @@ export async function fetchPublishedMenuMeals(stallId: string, date: string): Pr
     `)
     .eq('menu_schedules.stall_id', stallId)
     .eq('menu_schedules.menu_date', date)
-    .eq('menu_schedules.is_published', true)
-    .eq('meals.is_available', true);
+    .eq('menu_schedules.is_published', true);
 
   if (error) {
     console.error('[Inventory] Error fetching published meals:', error);
-    return { hasPublishedMenu: true, meals: [] };
+    return { hasPublishedMenu: true, scheduleId: scheduleData[0].id, meals: [] };
   }
 
   if (!data) {
-    return { hasPublishedMenu: true, meals: [] };
+    return { hasPublishedMenu: true, scheduleId: scheduleData[0].id, meals: [] };
   }
 
   // Deduplicate by meal_id since multiple schedules on same date could exist (if not unique)

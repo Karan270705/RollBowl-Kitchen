@@ -14,6 +14,8 @@ import { useCreateDraftBatch } from '@/src/hooks/useInventory';
 import { getPrimaryStallId } from '@/src/services/menu';
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { fetchPublishedMenuMeals, formatLocalDate } from '@/src/services/inventory';
+import { enableMeal, removeMealFromMenu } from '@/src/services/menu';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function CreateBatchScreen() {
   const insets = useSafeAreaInsets();
@@ -47,10 +49,12 @@ export default function CreateBatchScreen() {
 
   const [availableMeals, setAvailableMeals] = useState<any[]>([]);
   const [hasPublishedMenu, setHasPublishedMenu] = useState(true);
+  const [scheduleId, setScheduleId] = useState<string | undefined>();
   const [isLoadingMeals, setIsLoadingMeals] = useState(true);
   
   // Selected items mapped by mealId -> quantity
   const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
+  const queryClient = useQueryClient();
 
   const { mutateAsync: createDraft, isPending } = useCreateDraftBatch();
 
@@ -68,7 +72,7 @@ export default function CreateBatchScreen() {
 
   const fetchMeals = async (sid: string, selectedDate: Date) => {
     setIsLoadingMeals(true);
-    const { hasPublishedMenu: hasMenu, meals } = await fetchPublishedMenuMeals(sid, formatLocalDate(selectedDate));
+    const { hasPublishedMenu: hasMenu, scheduleId: sid2, meals } = await fetchPublishedMenuMeals(sid, formatLocalDate(selectedDate));
     
     console.log('[Inventory] Published meals fetched', {
       stallId: sid,
@@ -78,18 +82,22 @@ export default function CreateBatchScreen() {
     });
     
     setHasPublishedMenu(hasMenu);
+    setScheduleId(sid2);
     setAvailableMeals(meals);
     setIsLoadingMeals(false);
   };
 
   const handleSave = async () => {
     try {
-      const itemsPayload = Object.entries(selectedItems)
-        .filter(([_, qty]) => qty > 0)
-        .map(([mealId, qty]) => ({ mealId, loadedQuantity: qty }));
+      const itemsPayload = availableMeals.map(m => {
+        if (!m.is_available) return null;
+        return { mealId: m.id, loadedQuantity: selectedItems[m.id] || 0 };
+      }).filter(Boolean) as { mealId: string; loadedQuantity: number }[];
+      
+      const hasPositiveQty = itemsPayload.some(i => i.loadedQuantity > 0);
 
-      if (itemsPayload.length === 0) {
-        Alert.alert('Validation Error', 'Please select at least one meal with a quantity greater than 0.');
+      if (!hasPositiveQty) {
+        Alert.alert('Validation Error', 'Please select at least one available meal with a quantity greater than 0.');
         return;
       }
 
@@ -120,6 +128,39 @@ export default function CreateBatchScreen() {
       const next = Math.max(0, current + delta);
       return { ...prev, [mealId]: next };
     });
+  };
+
+  const handleEnableMeal = async (mealId: string) => {
+    try {
+      await enableMeal(mealId);
+      Alert.alert('Success', 'Meal enabled successfully.');
+      queryClient.invalidateQueries({ queryKey: ['mealsPool'] });
+      queryClient.invalidateQueries({ queryKey: ['menu'] });
+      if (stallId && date) fetchMeals(stallId, date);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  const handleRemoveFromMenu = (mealId: string) => {
+    Alert.alert('Remove Item', 'Are you sure you want to remove this item from the published menu?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          if (!scheduleId) return;
+          try {
+            await removeMealFromMenu(scheduleId, mealId);
+            Alert.alert('Success', 'Meal removed from published menu.');
+            queryClient.invalidateQueries({ queryKey: ['menu'] });
+            if (stallId && date) fetchMeals(stallId, date);
+          } catch (e: any) {
+            Alert.alert('Error', e.message);
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -158,25 +199,70 @@ export default function CreateBatchScreen() {
             </View>
           ) : availableMeals.length === 0 ? (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>The published menu contains no available items.</Text>
+              <Text style={styles.emptyStateText}>The published menu contains no items.</Text>
             </View>
           ) : (
-            availableMeals.map(meal => {
-              const qty = selectedItems[meal.id] || 0;
-              return (
-                <View key={meal.id} style={styles.mealRow}>
-                  <View style={styles.mealInfo}>
-                    <Text style={styles.mealName}>{meal.name}</Text>
-                    <Text style={styles.mealCategory}>{meal.category}</Text>
+            <>
+              <View style={styles.summaryBox}>
+                <Text style={styles.summaryText}>{availableMeals.length} published meals found.</Text>
+                <Text style={styles.summaryText}>{availableMeals.filter(m => m.is_available).length} available.</Text>
+                {availableMeals.filter(m => !m.is_available).length > 0 && (
+                   <Text style={[styles.summaryText, {color: Colors.error}]}>
+                     {availableMeals.filter(m => !m.is_available).length} unresolved: {availableMeals.filter(m => !m.is_available).map(m => m.name).join(', ')}.
+                   </Text>
+                )}
+              </View>
+              {availableMeals.filter(m => m.is_available).map(meal => {
+                const qty = selectedItems[meal.id] || 0;
+                return (
+                  <View key={meal.id} style={styles.mealRow}>
+                    <View style={styles.mealInfo}>
+                      <Text style={styles.mealName}>
+                        {meal.name}
+                      </Text>
+                      <Text style={styles.mealCategory}>{meal.category}</Text>
+                    </View>
+                    <View style={styles.stepper}>
+                      <Button variant="outline" title="-" onPress={() => updateQuantity(meal.id, -1)} disabled={qty === 0} style={styles.stepBtn as any} />
+                      <Text style={styles.qtyText}>{qty}</Text>
+                      <Button variant="outline" title="+" onPress={() => updateQuantity(meal.id, 1)} style={styles.stepBtn as any} />
+                    </View>
                   </View>
-                  <View style={styles.stepper}>
-                    <Button variant="outline" title="-" onPress={() => updateQuantity(meal.id, -1)} disabled={qty === 0} style={styles.stepBtn as any} />
-                    <Text style={styles.qtyText}>{qty}</Text>
-                    <Button variant="outline" title="+" onPress={() => updateQuantity(meal.id, 1)} style={styles.stepBtn as any} />
-                  </View>
+                );
+              })}
+              
+              {availableMeals.filter(m => !m.is_available).length > 0 && (
+                <View style={{ marginTop: Spacing.xl }}>
+                  <Text style={[styles.sectionTitle, { color: Colors.error }]}>Published but unavailable</Text>
+                  {availableMeals.filter(m => !m.is_available).map(meal => (
+                    <View key={meal.id} style={[styles.mealRow, styles.unavailableRow]}>
+                      <View style={styles.mealInfo}>
+                        <Text style={[styles.mealName, {color: Colors.error}]}>
+                          {meal.name}
+                        </Text>
+                        <Text style={styles.mealCategory}>{meal.category}</Text>
+                        <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
+                          <Button 
+                            title="Enable Meal" 
+                            variant="primary" 
+                            onPress={() => handleEnableMeal(meal.id)} 
+                            style={{ paddingHorizontal: 12, paddingVertical: 6, minHeight: 0 }}
+                            textStyle={{ fontSize: 12 }}
+                          />
+                          <Button 
+                            title="Remove from Published Menu" 
+                            variant="outline" 
+                            onPress={() => handleRemoveFromMenu(meal.id)}
+                            style={{ paddingHorizontal: 12, paddingVertical: 6, minHeight: 0, borderColor: Colors.error }}
+                            textStyle={{ fontSize: 12, color: Colors.error }}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  ))}
                 </View>
-              );
-            })
+              )}
+            </>
           )}
         </Card>
       </ScrollView>
@@ -232,5 +318,8 @@ const styles = StyleSheet.create({
   qtyText: { fontFamily: Typography.family.bold, fontSize: Typography.size.lg, color: Colors.textPrimary, minWidth: 24, textAlign: 'center' },
   footer: { padding: Spacing.base, backgroundColor: Colors.surface, borderTopWidth: 1, borderColor: Colors.border },
   emptyState: { padding: Spacing.xl, alignItems: 'center', justifyContent: 'center' },
-  emptyStateText: { fontFamily: Typography.family.medium, fontSize: Typography.size.base, color: Colors.textSecondary, textAlign: 'center', fontStyle: 'italic' }
+  emptyStateText: { fontFamily: Typography.family.medium, fontSize: Typography.size.base, color: Colors.textSecondary, textAlign: 'center', fontStyle: 'italic' },
+  summaryBox: { padding: Spacing.sm, backgroundColor: Colors.surface, borderRadius: Radii.sm, marginBottom: Spacing.md, borderWidth: 1, borderColor: Colors.border },
+  summaryText: { fontFamily: Typography.family.medium, fontSize: Typography.size.sm, color: Colors.textPrimary },
+  unavailableRow: { backgroundColor: '#fff5f5' }
 });

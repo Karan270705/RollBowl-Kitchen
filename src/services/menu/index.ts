@@ -188,6 +188,15 @@ export const getAllMeals = async (stallId?: string): Promise<Meal[]> => {
   }));
 };
 
+export const enableMeal = async (mealId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('meals')
+    .update({ is_available: true })
+    .eq('id', mealId);
+
+  if (error) throw error;
+};
+
 export const copyMenu = async (fromDate: string, toDate: string, stallId?: string): Promise<void> => {
   const actualStallId = stallId || await getPrimaryStallId();
   
