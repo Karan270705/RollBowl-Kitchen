@@ -6,14 +6,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
 import { useOperationalReservationsDetailed } from '@/src/services/dashboard';
 import { EmptyState } from '@/src/components/ui';
-import { getOperationalContext, formatDisplayDate } from '@/src/utils/helpers';
+import { formatDisplayDate } from '@/src/utils/helpers';
+import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 
 export default function OperationalReservationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data, isLoading, error } = useOperationalReservationsDetailed();
-
-  const { operationalDate } = getOperationalContext();
+  const { resolvedOperationalDate, isResolving } = useOperationalContext();
+  const { data, isPending, isLoading, error } = useOperationalReservationsDetailed(resolvedOperationalDate, isResolving);
 
   const SLOT_ORDER = [
     '12:00–12:30',
@@ -50,7 +50,7 @@ export default function OperationalReservationsScreen() {
     });
   }, [data]);
 
-  if (isLoading) {
+  if (isResolving || isPending) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
@@ -84,7 +84,7 @@ export default function OperationalReservationsScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitles}>
           <Text style={styles.headerTitle}>Order Reservations</Text>
-          <Text style={styles.headerSubtitle}>{formatDisplayDate(operationalDate)}</Text>
+          <Text style={styles.headerSubtitle}>{formatDisplayDate(new Date(resolvedOperationalDate))}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>

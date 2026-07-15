@@ -12,6 +12,7 @@ import { Input } from '@/src/components/ui/Input';
 import { getKitchenDate, formatDisplayDate, formatDateKey } from '@/src/utils/helpers';
 import { useCreateDraftBatch } from '@/src/hooks/useInventory';
 import { getPrimaryStallId } from '@/src/services/menu';
+import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { fetchPublishedMenuMeals, formatLocalDate } from '@/src/services/inventory';
 
 export default function CreateBatchScreen() {
@@ -19,17 +20,26 @@ export default function CreateBatchScreen() {
   const router = useRouter();
   
   const [stallId, setStallId] = useState<string>();
-  const [date, setDate] = useState<Date>(getKitchenDate());
-  const [windowStart, setWindowStart] = useState<Date>(() => {
-    const d = getKitchenDate();
-    d.setHours(12, 0, 0, 0);
-    return d;
-  });
-  const [windowEnd, setWindowEnd] = useState<Date>(() => {
-    const d = getKitchenDate();
-    d.setHours(14, 0, 0, 0);
-    return d;
-  });
+  const { resolvedOperationalDate, isResolving } = useOperationalContext(stallId);
+  const [date, setDate] = useState<Date | null>(null);
+  
+  const [windowStart, setWindowStart] = useState<Date | null>(null);
+  const [windowEnd, setWindowEnd] = useState<Date | null>(null);
+
+  useEffect(() => {
+    if (!isResolving && resolvedOperationalDate && !date) {
+      const d = new Date(resolvedOperationalDate);
+      setDate(d);
+      
+      const start = new Date(d);
+      start.setHours(12, 0, 0, 0);
+      setWindowStart(start);
+      
+      const end = new Date(d);
+      end.setHours(14, 0, 0, 0);
+      setWindowEnd(end);
+    }
+  }, [resolvedOperationalDate, isResolving, date]);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -51,7 +61,7 @@ export default function CreateBatchScreen() {
   }, []);
 
   useEffect(() => {
-    if (stallId) {
+    if (stallId && date) {
       fetchMeals(stallId, date);
     }
   }, [date, stallId]);
@@ -82,6 +92,8 @@ export default function CreateBatchScreen() {
         Alert.alert('Validation Error', 'Please select at least one meal with a quantity greater than 0.');
         return;
       }
+
+      if (!date || !windowStart || !windowEnd) return;
 
       if (windowEnd <= windowStart) {
         Alert.alert('Validation Error', 'Window end time must be after the start time.');
@@ -122,16 +134,16 @@ export default function CreateBatchScreen() {
           <Text style={styles.sectionTitle}>Delivery Window</Text>
           
           <Text style={styles.label}>Date</Text>
-          <Button variant="outline" title={formatDisplayDate(date)} onPress={() => setShowDatePicker(true)} style={styles.pickerBtn} />
+          <Button variant="outline" title={date ? formatDisplayDate(date) : 'Loading...'} onPress={() => setShowDatePicker(true)} style={styles.pickerBtn} disabled={!date} />
           
           <View style={styles.row}>
             <View style={{ flex: 1, marginRight: Spacing.xs }}>
               <Text style={styles.label}>Start Time</Text>
-              <Button variant="outline" title={windowStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} onPress={() => setShowStartPicker(true)} style={styles.pickerBtn} />
+              <Button variant="outline" title={windowStart ? windowStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Loading...'} onPress={() => setShowStartPicker(true)} style={styles.pickerBtn} disabled={!windowStart} />
             </View>
             <View style={{ flex: 1, marginLeft: Spacing.xs }}>
               <Text style={styles.label}>End Time</Text>
-              <Button variant="outline" title={windowEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} onPress={() => setShowEndPicker(true)} style={styles.pickerBtn} />
+              <Button variant="outline" title={windowEnd ? windowEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Loading...'} onPress={() => setShowEndPicker(true)} style={styles.pickerBtn} disabled={!windowEnd} />
             </View>
           </View>
         </Card>
@@ -178,19 +190,19 @@ export default function CreateBatchScreen() {
         />
       </View>
 
-      {showDatePicker && (
+      {showDatePicker && date && (
         <DateTimePicker
           value={date} mode="date" display="default"
           onChange={(e, d) => { setShowDatePicker(false); if(d) { setDate(d); setSelectedItems({}); } }}
         />
       )}
-      {showStartPicker && (
+      {showStartPicker && windowStart && (
         <DateTimePicker
           value={windowStart} mode="time" display="default"
           onChange={(e, d) => { setShowStartPicker(false); if(d) { const nd = new Date(windowStart); nd.setHours(d.getHours(), d.getMinutes()); setWindowStart(nd); } }}
         />
       )}
-      {showEndPicker && (
+      {showEndPicker && windowEnd && (
         <DateTimePicker
           value={windowEnd} mode="time" display="default"
           onChange={(e, d) => { setShowEndPicker(false); if(d) { const nd = new Date(windowEnd); nd.setHours(d.getHours(), d.getMinutes()); setWindowEnd(nd); } }}

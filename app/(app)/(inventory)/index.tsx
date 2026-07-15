@@ -11,6 +11,7 @@ import { Button } from '@/src/components/ui/Button';
 import { getKitchenDate, formatDateKey, formatDisplayDate, formatTimeSlot, isBatchExpired } from '@/src/utils/helpers';
 import { useInventoryBatches, useLiveInventoryStatus, useInventoryBatchItems, useActivateBatch, useCancelBatch, useCloseBatch } from '@/src/hooks/useInventory';
 import { getPrimaryStallId } from '@/src/services/menu';
+import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 
 const BatchCard = ({ batch, onActivate, onCancel, onClose }: { batch: any, onActivate: (id: string) => void, onCancel: (id: string) => void, onClose: (id: string) => void }) => {
   const router = useRouter();
@@ -63,7 +64,9 @@ const BatchCard = ({ batch, onActivate, onCancel, onClose }: { batch: any, onAct
           <Text style={styles.itemCountText}>{itemCount} Items</Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: statusColor + '1A', borderColor: statusColor + '40' }]}>
-          <Text style={[styles.statusText, { color: statusColor }]}>{isStale ? "STALE" : batch.status.toUpperCase()}</Text>
+          <Text style={[styles.statusText, { color: statusColor }]}>
+            {isStale ? "STALE" : batch.status === 'active' ? "LIVE NOW" : batch.status.toUpperCase()}
+          </Text>
         </View>
       </View>
 
@@ -113,16 +116,42 @@ const BatchCard = ({ batch, onActivate, onCancel, onClose }: { batch: any, onAct
 export default function InventoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState<Date>(getKitchenDate());
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [stallId, setStallId] = useState<string>();
+  const { resolvedOperationalDate, isResolving } = useOperationalContext(stallId);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
     getPrimaryStallId().then(setStallId).catch(console.error);
   }, []);
 
-  const dateKey = formatDateKey(selectedDate);
-  const { data: batches, isLoading } = useInventoryBatches(stallId, dateKey);
+  useEffect(() => {
+    if (!isResolving && resolvedOperationalDate && !selectedDate) {
+      setSelectedDate(new Date(resolvedOperationalDate));
+    }
+  }, [resolvedOperationalDate, isResolving]);
+
+  const dateKey = selectedDate ? formatDateKey(selectedDate) : null;
+  const { data: batches, isLoading } = useInventoryBatches(stallId, dateKey || formatDateKey(new Date()));
+
+  // Sort batches: Active (non-expired) > Active (expired/stale) > Upcoming (Drafts) > Historical
+  const sortedBatches = React.useMemo(() => {
+    if (!batches) return [];
+    return [...batches].sort((a, b) => {
+      const aIsActive = a.status === 'active';
+      const bIsActive = b.status === 'active';
+      const aIsStale = aIsActive && isBatchExpired(a.inventory_date, a.window_end);
+      const bIsStale = bIsActive && isBatchExpired(b.inventory_date, b.window_end);
+      
+      if (aIsActive && !aIsStale && (!bIsActive || bIsStale)) return -1;
+      if (bIsActive && !bIsStale && (!aIsActive || aIsStale)) return 1;
+      
+      if (aIsActive && (!bIsActive)) return -1;
+      if (bIsActive && (!aIsActive)) return 1;
+      
+      return a.window_start?.localeCompare(b.window_start || '') || 0;
+    });
+  }, [batches]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + Spacing.base }]}>
@@ -133,12 +162,12 @@ export default function InventoryScreen() {
           onPress={() => setShowDatePicker(true)}
         >
           <Ionicons name="calendar-outline" size={20} color={Colors.primary} />
-          <Text style={styles.dateSelectorText}>{formatDisplayDate(selectedDate)}</Text>
+          <Text style={styles.dateSelectorText}>{selectedDate ? formatDisplayDate(selectedDate) : 'Loading...'}</Text>
           <Ionicons name="chevron-down" size={16} color={Colors.primary} />
         </TouchableOpacity>
       </View>
 
-      {showDatePicker && (
+      {showDatePicker && selectedDate && (
         <DateTimePicker
           value={selectedDate}
           mode="date"
@@ -151,24 +180,29 @@ export default function InventoryScreen() {
       )}
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {isLoading ? (
+        {isLoading || !selectedDate ? (
           <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: Spacing.xl }} />
-        ) : batches?.length === 0 ? (
+        ) : sortedBatches?.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="cube-outline" size={48} color={Colors.textTertiary} />
             <Text style={styles.emptyStateTitle}>No Batches Found</Text>
             <Text style={styles.emptyStateDesc}>There are no inventory batches scheduled for this date.</Text>
           </View>
         ) : (
-          batches?.map(batch => (
-            <BatchCard 
-              key={batch.id} 
-              batch={batch} 
-              onActivate={() => {}} 
-              onCancel={() => {}} 
-              onClose={() => {}} 
-            />
-          ))
+          sortedBatches?.map((batch, index) => {
+            const isOtherBatchesStart = index > 0 && batch.status !== 'active' && sortedBatches[index - 1].status === 'active';
+            return (
+              <React.Fragment key={batch.id}>
+                {isOtherBatchesStart && <Text style={styles.sectionTitle}>OTHER BATCHES</Text>}
+                <BatchCard 
+                  batch={batch} 
+                  onActivate={() => {}} 
+                  onCancel={() => {}} 
+                  onClose={() => {}} 
+                />
+              </React.Fragment>
+            );
+          })
         )}
       </ScrollView>
 
@@ -299,5 +333,15 @@ const styles = StyleSheet.create({
   actionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  }
+  },
+  sectionTitle: {
+    fontSize: Typography.size.sm,
+    fontFamily: Typography.family.semiBold,
+    color: Colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: Spacing.sm,
+    marginLeft: Spacing.xs,
+    marginTop: Spacing.md,
+  },
 });

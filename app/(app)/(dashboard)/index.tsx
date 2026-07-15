@@ -5,9 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
 import { useUser } from '@/src/store';
 import {
-  getOperationalContext,
   formatDisplayDate,
 } from '@/src/utils/helpers';
+import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { useOperationalMenuStatus } from '@/src/hooks/useMenu';
 import { useDashboardMetrics } from '@/src/services/dashboard';
 import { EmptyState } from '@/src/components/ui';
@@ -18,14 +18,14 @@ export default function DashboardScreen() {
   const user = useUser();
   const router = useRouter();
 
-  const { executionDate, operationalDate } = getOperationalContext();
+  const { calendarDate, resolvedOperationalDate, isResolving } = useOperationalContext();
 
-  const { data: menuStatus } = useOperationalMenuStatus();
-  const { data: metrics, isLoading, error } = useDashboardMetrics();
+  const { data: menuStatus } = useOperationalMenuStatus(resolvedOperationalDate, isResolving);
+  const { data: metrics, isPending, isLoading, error } = useDashboardMetrics(calendarDate, resolvedOperationalDate, isResolving);
 
   const greeting = getGreeting();
 
-  if (isLoading) {
+  if (isResolving || isPending) {
     return (
       <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center' }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -46,7 +46,7 @@ export default function DashboardScreen() {
     <View style={styles.sectionContainer}>
       <View style={styles.domainHeader}>
         <Text style={styles.domainTitle}>
-          OPERATIONS • {formatDisplayDate(executionDate).toUpperCase()}
+          OPERATIONS • {formatDisplayDate(new Date(calendarDate)).toUpperCase()}
         </Text>
       </View>
 
@@ -122,7 +122,7 @@ export default function DashboardScreen() {
     <View style={styles.sectionContainer}>
       <View style={styles.domainHeader}>
         <Text style={styles.domainTitle}>
-          PREPARATION • {formatDisplayDate(operationalDate).toUpperCase()}
+          PREPARATION • {formatDisplayDate(new Date(resolvedOperationalDate)).toUpperCase()}
         </Text>
       </View>
 

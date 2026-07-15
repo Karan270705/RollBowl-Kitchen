@@ -208,12 +208,9 @@ export const copyMenu = async (fromDate: string, toDate: string, stallId?: strin
   await saveMenuMeals(targetSchedule.id, mealIds);
 };
 
-import { getOperationalContext, formatDateKey } from '@/src/utils/helpers';
-
-export const getOperationalMenuStatus = async (): Promise<{ isConfigured: boolean; itemCount: number }> => {
+export const getOperationalMenuStatus = async (resolvedOperationalDate: string): Promise<{ isConfigured: boolean; itemCount: number }> => {
   try {
-    const { operationalDate } = getOperationalContext();
-    const dateStr = formatDateKey(operationalDate);
+    const dateStr = resolvedOperationalDate;
     const { schedule, items } = await getMenuForDate(dateStr);
     
     return {

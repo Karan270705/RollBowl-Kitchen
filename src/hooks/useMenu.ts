@@ -23,10 +23,11 @@ export const useMealsPool = () => {
   });
 };
 
-export const useOperationalMenuStatus = () => {
+export const useOperationalMenuStatus = (resolvedOperationalDate?: string, isResolving?: boolean) => {
   return useQuery({
-    queryKey: ['menu', 'operational-status'],
-    queryFn: getOperationalMenuStatus,
+    queryKey: ['menu', 'operational-status', resolvedOperationalDate],
+    queryFn: () => getOperationalMenuStatus(resolvedOperationalDate!),
+    enabled: !!resolvedOperationalDate && !isResolving,
     refetchInterval: 1000 * 60 * 5, // Refetch every 5 minutes
   });
 };

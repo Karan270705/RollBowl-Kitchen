@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
   invalidMealSubText: { color: Colors.error, fontSize: Typography.size.xs, fontFamily: Typography.family.regular },
   itemCard: { marginBottom: Spacing.md, padding: Spacing.base },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.base },
-  cardMealName: { fontFamily: Typography.family.bold, fontSize: Typography.size.base, color: Colors.textPrimary },
+  cardMealName: { flex: 1, flexWrap: 'wrap', marginRight: Spacing.sm, fontFamily: Typography.family.bold, fontSize: Typography.size.base, color: Colors.textPrimary },
   cardStatsRow: { flexDirection: 'row', justifyContent: 'space-around', backgroundColor: Colors.background, paddingVertical: Spacing.sm, borderRadius: Radii.sm, marginBottom: Spacing.md },
   cardStatCol: { alignItems: 'center' },
   cardStatVal: { fontFamily: Typography.family.bold, fontSize: Typography.size.base, color: Colors.textPrimary },

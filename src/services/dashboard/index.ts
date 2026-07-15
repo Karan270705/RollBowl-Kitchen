@@ -27,19 +27,22 @@ export interface DashboardMetrics {
   holidayOperational: KitchenHoliday | null;
 }
 
-export const fetchDashboardMetrics = async (stallId?: string): Promise<DashboardMetrics> => {
-  const { executionDate, operationalDate } = getOperationalContext();
+export const fetchDashboardMetrics = async (
+  calendarDate: string,
+  resolvedOperationalDate: string,
+  stallId?: string
+): Promise<DashboardMetrics> => {
   const actualStallId = stallId || await getPrimaryStallId();
 
   // 1. Fetch Execution Orders & Holidays
   const [executionOrdersList, holidayExecution, holidayOperational] = await Promise.all([
     fetchOrders({
       stallId: actualStallId,
-      date: formatDateKey(executionDate),
+      date: calendarDate, // replaced executionDate
       includeCancelled: false,
     }),
-    getHolidayForDate(formatDateKey(executionDate), actualStallId),
-    getHolidayForDate(formatDateKey(operationalDate), actualStallId)
+    getHolidayForDate(calendarDate, actualStallId),
+    getHolidayForDate(resolvedOperationalDate, actualStallId)
   ]);
 
   // 2. Fetch Active Subscriptions
@@ -54,7 +57,7 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
   // 3. Fetch Operational Reservations
   const operationalOrders = await fetchOrders({
     stallId: actualStallId,
-    date: formatDateKey(operationalDate),
+    date: resolvedOperationalDate,
     includeCancelled: false,
     statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
   });
@@ -103,7 +106,7 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
     .from('order_items')
     .select('meal_name, quantity, orders!inner(id, pickup_date, stall_id)')
     .eq('orders.stall_id', actualStallId)
-    .eq('orders.pickup_date', formatDateKey(executionDate));
+    .eq('orders.pickup_date', calendarDate);
 
   let mostOrderedMeal = null;
   if (!itemsError && orderItemsData) {
@@ -143,12 +146,13 @@ export const fetchDashboardMetrics = async (stallId?: string): Promise<Dashboard
   };
 };
 
-export const useDashboardMetrics = () => {
+export const useDashboardMetrics = (calendarDate: string, resolvedOperationalDate: string, isResolving: boolean) => {
   return useQuery({
-    queryKey: ['dashboard_metrics', formatDateKey(getOperationalContext().executionDate)],
+    queryKey: ['dashboard_metrics', calendarDate, resolvedOperationalDate],
     queryFn: () => {
-      return fetchDashboardMetrics();
+      return fetchDashboardMetrics(calendarDate, resolvedOperationalDate);
     },
+    enabled: !isResolving,
     refetchInterval: 30000, // Refresh every 30 seconds for live feel
   });
 };
@@ -170,19 +174,21 @@ export interface OperationalReservationDetails {
   holidayOperational: KitchenHoliday | null;
 }
 
-export const fetchOperationalReservationsDetailed = async (stallId?: string): Promise<OperationalReservationDetails> => {
-  const { operationalDate } = getOperationalContext();
+export const fetchOperationalReservationsDetailed = async (
+  resolvedOperationalDate: string,
+  stallId?: string
+): Promise<OperationalReservationDetails> => {
   const actualStallId = stallId || await getPrimaryStallId();
 
   // Fetch all orders for operational date & check holiday
   const [orders, holidayOperational] = await Promise.all([
     fetchOrders({
       stallId: actualStallId,
-      date: formatDateKey(operationalDate),
+      date: resolvedOperationalDate,
       includeCancelled: false,
       statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
     }),
-    getHolidayForDate(formatDateKey(operationalDate), actualStallId)
+    getHolidayForDate(resolvedOperationalDate, actualStallId)
   ]);
 
   let totalMealsReserved = 0;
@@ -223,10 +229,11 @@ export const fetchOperationalReservationsDetailed = async (stallId?: string): Pr
   };
 };
 
-export const useOperationalReservationsDetailed = () => {
+export const useOperationalReservationsDetailed = (resolvedOperationalDate: string, isResolving: boolean) => {
   return useQuery({
-    queryKey: ['operational_reservations_detailed', formatDateKey(getOperationalContext().operationalDate)],
-    queryFn: () => fetchOperationalReservationsDetailed(),
+    queryKey: ['operational_reservations_detailed', resolvedOperationalDate],
+    queryFn: () => fetchOperationalReservationsDetailed(resolvedOperationalDate),
+    enabled: !isResolving,
     refetchInterval: 60000,
   });
 };
