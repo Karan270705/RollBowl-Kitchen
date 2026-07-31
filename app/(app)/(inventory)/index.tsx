@@ -117,7 +117,8 @@ export default function InventoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [stallId, setStallId] = useState<string>();
-  const { resolvedOperationalDate, isResolving } = useOperationalContext(stallId);
+  const { resolvedOperationalDate, preparationDate, calendarDate, isResolving } = useOperationalContext(stallId);
+  const targetDateStr = resolvedOperationalDate || preparationDate || calendarDate;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -126,13 +127,13 @@ export default function InventoryScreen() {
   }, []);
 
   useEffect(() => {
-    if (!isResolving && resolvedOperationalDate && !selectedDate) {
-      setSelectedDate(new Date(resolvedOperationalDate));
+    if (!isResolving && targetDateStr && !selectedDate) {
+      setSelectedDate(new Date(targetDateStr));
     }
-  }, [resolvedOperationalDate, isResolving]);
+  }, [targetDateStr, isResolving, selectedDate]);
 
-  const dateKey = selectedDate ? formatDateKey(selectedDate) : null;
-  const { data: batches, isLoading } = useInventoryBatches(stallId, dateKey || formatDateKey(new Date()));
+  const dateKey = selectedDate ? formatDateKey(selectedDate) : (targetDateStr || formatDateKey(new Date()));
+  const { data: batches, isLoading } = useInventoryBatches(stallId, dateKey);
 
   // Sort batches: Active (non-expired) > Active (expired/stale) > Upcoming (Drafts) > Historical
   const sortedBatches = React.useMemo(() => {

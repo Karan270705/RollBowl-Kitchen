@@ -13,8 +13,8 @@ interface OrderCardProps {
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
   const { stallId, resolvedOperationalDate } = useOperationalContext(order.stallId);
-  const { mutate: updateStatus, isPending } = useUpdateOrderStatus(stallId, resolvedOperationalDate);
-  const { mutate: updatePaymentStatus, isPending: isPaymentPending } = useUpdateOrderPaymentStatus(stallId, resolvedOperationalDate);
+  const { mutate: updateStatus, isPending } = useUpdateOrderStatus(stallId, order.pickupDate || resolvedOperationalDate);
+  const { mutate: updatePaymentStatus, isPending: isPaymentPending } = useUpdateOrderPaymentStatus(stallId, order.pickupDate || resolvedOperationalDate);
   const [isProofModalVisible, setIsProofModalVisible] = useState(false);
 
   const isUpiOrder = order.paymentMethod === 'upi';

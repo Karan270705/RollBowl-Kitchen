@@ -19,15 +19,24 @@ export default function DashboardScreen() {
   const user = useUser();
   const router = useRouter();
 
-  const { stallId, calendarDate, resolvedOperationalDate, isResolving } = useOperationalContext();
+  const { stallId, calendarDate, resolvedOperationalDate, preparationDate, isResolving } = useOperationalContext();
 
   // Initialize Realtime subscription
   useDashboardRealtime(stallId, resolvedOperationalDate);
 
-  const { data: menuStatus } = useOperationalMenuStatus(resolvedOperationalDate, isResolving);
-  const { data: metrics, isPending, isLoading, error } = useDashboardMetrics(calendarDate, resolvedOperationalDate, isResolving, stallId);
+  const { data: menuStatus } = useOperationalMenuStatus(preparationDate, isResolving);
+  const { data: metrics, isPending, isLoading, error } = useDashboardMetrics(calendarDate, resolvedOperationalDate, preparationDate, isResolving, stallId);
 
   const greeting = getGreeting();
+
+  console.log('[DASHBOARD LOAD STATE]', JSON.stringify({
+    operationalLoading: isResolving,
+    operationalFetching: isResolving,
+    resolvedOperationalDate,
+    metricsLoading: isLoading,
+    metricsFetching: isPending,
+    metricsError: error ? (error as any).message || String(error) : null,
+  }, null, 2));
 
   if (isResolving || isPending) {
     return (
@@ -50,7 +59,7 @@ export default function DashboardScreen() {
     <View style={styles.sectionContainer}>
       <View style={styles.domainHeader}>
         <Text style={styles.domainTitle}>
-          OPERATIONS • {formatDisplayDate(new Date(calendarDate)).toUpperCase()}
+          OPERATIONS • {resolvedOperationalDate ? formatDisplayDate(new Date(resolvedOperationalDate)).toUpperCase() : 'NO ACTIVE OPERATIONS'}
         </Text>
       </View>
 
@@ -126,7 +135,7 @@ export default function DashboardScreen() {
     <View style={styles.sectionContainer}>
       <View style={styles.domainHeader}>
         <Text style={styles.domainTitle}>
-          PREPARATION • {formatDisplayDate(new Date(resolvedOperationalDate)).toUpperCase()}
+          PREPARATION • {formatDisplayDate(new Date(preparationDate)).toUpperCase()}
         </Text>
       </View>
 

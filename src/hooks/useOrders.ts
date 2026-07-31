@@ -5,16 +5,16 @@ import { dashboardKeys, ordersKeys } from '../constants/queryKeys';
 import { normalizeError } from '../utils/errors';
 import { Alert } from 'react-native';
 
-export const useOrders = (stallId: string | undefined, operationsDate: string | undefined) => {
+export const useOrders = (stallId: string | undefined, operationsDate: string | undefined | null) => {
   return useQuery({
     queryKey: stallId && operationsDate ? ordersKeys.list(stallId, operationsDate) : ['orders', 'skip'],
-    queryFn: () => fetchOrders({ stallId, date: operationsDate, includeCancelled: false }),
+    queryFn: () => fetchOrders({ stallId, date: operationsDate || undefined, includeCancelled: false }),
     refetchInterval: 15000,
     enabled: !!stallId && !!operationsDate,
   });
 };
 
-export const useUpdateOrderStatus = (stallId: string | undefined, operationsDate: string | undefined) => {
+export const useUpdateOrderStatus = (stallId: string | undefined, operationsDate: string | undefined | null) => {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -39,7 +39,7 @@ export const useUpdateOrderStatus = (stallId: string | undefined, operationsDate
   });
 };
 
-export const useUpdateOrderPaymentStatus = (stallId: string | undefined, operationsDate: string | undefined) => {
+export const useUpdateOrderPaymentStatus = (stallId: string | undefined, operationsDate: string | undefined | null) => {
   const queryClient = useQueryClient();
 
   return useMutation({

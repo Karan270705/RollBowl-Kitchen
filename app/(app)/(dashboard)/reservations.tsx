@@ -12,8 +12,8 @@ import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 export default function OperationalReservationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { resolvedOperationalDate, isResolving } = useOperationalContext();
-  const { data, isPending, isLoading, error } = useOperationalReservationsDetailed(resolvedOperationalDate, isResolving);
+  const { preparationDate, isResolving } = useOperationalContext();
+  const { data, isPending, isLoading, error } = useOperationalReservationsDetailed(preparationDate, isResolving);
 
   const SLOT_ORDER = [
     '12:00–12:30',
@@ -84,7 +84,7 @@ export default function OperationalReservationsScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitles}>
           <Text style={styles.headerTitle}>Order Reservations</Text>
-          <Text style={styles.headerSubtitle}>{formatDisplayDate(new Date(resolvedOperationalDate))}</Text>
+          <Text style={styles.headerSubtitle}>{formatDisplayDate(new Date(preparationDate))}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>

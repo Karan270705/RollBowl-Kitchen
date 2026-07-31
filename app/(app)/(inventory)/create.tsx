@@ -22,15 +22,16 @@ export default function CreateBatchScreen() {
   const router = useRouter();
   
   const [stallId, setStallId] = useState<string>();
-  const { resolvedOperationalDate, isResolving } = useOperationalContext(stallId);
+  const { resolvedOperationalDate, preparationDate, calendarDate, isResolving } = useOperationalContext(stallId);
+  const targetDateStr = resolvedOperationalDate || preparationDate || calendarDate;
   const [date, setDate] = useState<Date | null>(null);
   
   const [windowStart, setWindowStart] = useState<Date | null>(null);
   const [windowEnd, setWindowEnd] = useState<Date | null>(null);
 
   useEffect(() => {
-    if (!isResolving && resolvedOperationalDate && !date) {
-      const d = new Date(resolvedOperationalDate);
+    if (!isResolving && targetDateStr && !date) {
+      const d = new Date(targetDateStr);
       setDate(d);
       
       const start = new Date(d);
@@ -41,7 +42,7 @@ export default function CreateBatchScreen() {
       end.setHours(14, 0, 0, 0);
       setWindowEnd(end);
     }
-  }, [resolvedOperationalDate, isResolving, date]);
+  }, [targetDateStr, isResolving, date]);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showStartPicker, setShowStartPicker] = useState(false);

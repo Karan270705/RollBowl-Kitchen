@@ -1,10 +1,31 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/src/lib/supabase';
 import { dashboardKeys, ordersKeys } from '@/src/constants/queryKeys';
 
-export const useDashboardRealtime = (stallId: string | undefined, operationsDate: string) => {
+export const useDashboardRealtime = (stallId: string | undefined, operationsDate: string | null) => {
   const queryClient = useQueryClient();
+  const prevDateRef = useRef<string | null>(operationsDate);
+
+  useEffect(() => {
+    if (prevDateRef.current !== operationsDate) {
+      console.log('[DASHBOARD DATE SWITCH]', JSON.stringify({
+        oldDate: prevDateRef.current,
+        newDate: operationsDate,
+        oldChannelRemoved: prevDateRef.current && stallId ? `kitchen-dashboard:${stallId}:${prevDateRef.current}` : null,
+        newChannelCreated: operationsDate && stallId ? `kitchen-dashboard:${stallId}:${operationsDate}` : null,
+        queriesInvalidated: true,
+      }, null, 2));
+
+      // Invalidate queries for the old date so no stale cache remains
+      if (prevDateRef.current && stallId) {
+        queryClient.invalidateQueries({ queryKey: ['dashboard_summary', stallId] });
+        queryClient.invalidateQueries({ queryKey: ['orders', 'list', stallId] });
+      }
+
+      prevDateRef.current = operationsDate;
+    }
+  }, [operationsDate, stallId, queryClient]);
 
   useEffect(() => {
     if (!stallId || !operationsDate) return;
@@ -23,7 +44,6 @@ export const useDashboardRealtime = (stallId: string | undefined, operationsDate
           filter: `stall_id=eq.${stallId}`,
         },
         (payload: any) => {
-          // Check pickup_date from either new or old record
           const record = payload.new && Object.keys(payload.new).length > 0 ? payload.new : payload.old;
           if (record && record.pickup_date === operationsDate) {
             console.log('[DASHBOARD REALTIME] Order changed', {
@@ -36,15 +56,11 @@ export const useDashboardRealtime = (stallId: string | undefined, operationsDate
               paymentStatus: record.payment_status,
             });
 
-            // Invalidate keys that depend on operationsDate
-            queryClient.invalidateQueries({ queryKey: dashboardKeys.summary(stallId, operationsDate) });
-            queryClient.invalidateQueries({ queryKey: dashboardKeys.mostOrdered(stallId, operationsDate) });
-            queryClient.invalidateQueries({ queryKey: dashboardKeys.paymentBreakdown(stallId, operationsDate) });
+            queryClient.invalidateQueries({ queryKey: ['dashboard_summary', stallId] });
             queryClient.invalidateQueries({ queryKey: ordersKeys.list(stallId, operationsDate) });
           }
         }
       )
-      // Subscribe to Order Items
       .on(
         'postgres_changes',
         {
@@ -59,9 +75,7 @@ export const useDashboardRealtime = (stallId: string | undefined, operationsDate
             itemId: (payload.new || payload.old)?.id,
           });
 
-          // Conservatively invalidate since order_items doesn't have pickup_date directly
-          queryClient.invalidateQueries({ queryKey: dashboardKeys.mostOrdered(stallId, operationsDate) });
-          queryClient.invalidateQueries({ queryKey: dashboardKeys.summary(stallId, operationsDate) });
+          queryClient.invalidateQueries({ queryKey: ['dashboard_summary', stallId] });
         }
       );
 
