@@ -34,6 +34,7 @@ export interface OperationalContextResult {
   windowEnd: string | null;
   phase: string;
   isResolving: boolean;
+  stallId?: string;
 }
 
 export const DEFAULT_RESOLVING_CONTEXT: OperationalContextResult = {
@@ -71,6 +72,7 @@ export async function resolveSharedOperationalDate(stallId?: string): Promise<Op
       windowEnd,
       phase,
       isResolving: false,
+      stallId,
     };
     console.log(JSON.stringify(result, null, 2));
     return result;

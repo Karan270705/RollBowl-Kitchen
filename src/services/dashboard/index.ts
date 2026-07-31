@@ -1,10 +1,10 @@
 import { supabase } from '@/src/lib/supabase';
 import { getPrimaryStallId } from '@/src/services/menu';
-import { getOperationalContext, formatDateKey } from '@/src/utils/helpers';
 import { useQuery } from '@tanstack/react-query';
 import { Order, KitchenHoliday } from '@/src/types/models';
 import { fetchOrders } from '@/src/services/orders';
 import { getHolidayForDate } from '@/src/services/holidays';
+import { dashboardKeys } from '@/src/constants/queryKeys';
 
 export interface DashboardMetrics {
   executionOrders: {
@@ -33,20 +33,21 @@ export const fetchDashboardMetrics = async (
   stallId?: string
 ): Promise<DashboardMetrics> => {
   const actualStallId = stallId || await getPrimaryStallId();
+  const operationsDate = resolvedOperationalDate;
 
-  // 1. Fetch Execution Orders & Holidays
+  // 1. Fetch Execution Orders (Operations dataset) & Holidays
+  // Authoritative dataset: stall_id and pickup_date === operationsDate
   const [executionOrdersList, holidayExecution, holidayOperational] = await Promise.all([
     fetchOrders({
       stallId: actualStallId,
-      date: calendarDate, // replaced executionDate
-      includeCancelled: false,
+      date: operationsDate,
+      includeCancelled: true, // We fetch all and filter in memory so we have accurate totals if needed
     }),
     getHolidayForDate(calendarDate, actualStallId),
-    getHolidayForDate(resolvedOperationalDate, actualStallId)
+    getHolidayForDate(operationsDate, actualStallId)
   ]);
 
   // 2. Fetch Active Subscriptions
-  // Assuming a stall_id or just count all active for single-stall operation
   const { count: activeSubCount, error: subError } = await supabase
     .from('subscriptions')
     .select('*', { count: 'exact', head: true })
@@ -54,42 +55,39 @@ export const fetchDashboardMetrics = async (
 
   if (subError) throw subError;
 
-  // 3. Fetch Operational Reservations
-  const operationalOrders = await fetchOrders({
-    stallId: actualStallId,
-    date: resolvedOperationalDate,
-    includeCancelled: false,
-    statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
-  });
-
+  // 3. Operational Reservations (from authoritative operations dataset)
+  // We use the same executionOrdersList to ensure consistency
   let operationalTotalMeals = 0;
-  for (const order of operationalOrders) {
-    if (order.items) {
-      for (const item of order.items) {
-        operationalTotalMeals += item.quantity;
+  let operationalResCount = 0;
+  
+  for (const order of executionOrdersList) {
+    if (order.status !== 'cancelled') {
+      operationalResCount++;
+      if (order.items) {
+        for (const item of order.items) {
+          operationalTotalMeals += item.quantity;
+        }
       }
     }
   }
 
-  const operationalResCount = operationalOrders.length;
-
   // 4. Calculate Metrics
-  console.log(`[Dashboard] Received ${executionOrdersList.length} execution orders.`);
-  console.log('[Dashboard] Array:', JSON.stringify(executionOrdersList.map(o => ({ id: o.id, status: o.status, pickupDate: o.pickupDate })), null, 2));
-
-  let pending = 0, accepted = 0, ready = 0, collected = 0;
+  let total = 0, pending = 0, accepted = 0, ready = 0, collected = 0;
   let subscriptionOrders = 0, cashOrders = 0, pendingRequiresAttention = 0;
-
   const now = new Date().getTime();
 
   for (const order of executionOrdersList) {
+    if (order.status === 'cancelled') continue; // Exclude cancelled from business-summary metrics
+    
+    total++;
+    
     if (order.status === 'pending') pending++;
     else if (order.status === 'confirmed' || order.status === 'preparing') accepted++;
     else if (order.status === 'ready') ready++;
     else if (order.status === 'picked_up' || order.status === 'delivered') collected++;
 
     if (order.orderType === 'subscription') subscriptionOrders++;
-    else cashOrders++;
+    if (order.paymentMethod === 'cash') cashOrders++;
 
     if (order.status === 'pending') {
       const orderTime = new Date(order.createdAt).getTime();
@@ -100,41 +98,38 @@ export const fetchDashboardMetrics = async (
     }
   }
 
-  // 5. Most Ordered Meal
-  // Need to join order_items for execution orders
-  const { data: orderItemsData, error: itemsError } = await supabase
-    .from('order_items')
-    .select('meal_name, quantity, orders!inner(id, pickup_date, stall_id)')
-    .eq('orders.stall_id', actualStallId)
-    .eq('orders.pickup_date', calendarDate);
-
+  // 5. Most Ordered Today (Aggregate from the authoritative dataset)
   let mostOrderedMeal = null;
-  if (!itemsError && orderItemsData) {
-    const mealCounts: Record<string, number> = {};
-    for (const item of orderItemsData) {
-      mealCounts[item.meal_name] = (mealCounts[item.meal_name] || 0) + item.quantity;
-    }
-    
-    let max = 0;
-    for (const [mealName, qty] of Object.entries(mealCounts)) {
-      if (qty > max) {
-        max = qty;
-        mostOrderedMeal = mealName;
+  const mealCounts: Record<string, number> = {};
+  
+  for (const order of executionOrdersList) {
+    if (order.status === 'cancelled') continue;
+    if (order.items) {
+      for (const item of order.items) {
+        mealCounts[item.mealName] = (mealCounts[item.mealName] || 0) + item.quantity;
       }
+    }
+  }
+
+  let max = 0;
+  for (const [mealName, qty] of Object.entries(mealCounts)) {
+    if (qty > max) {
+      max = qty;
+      mostOrderedMeal = mealName;
     }
   }
 
   return {
     executionOrders: {
-      total: executionOrdersList.length,
+      total,
       pending,
       accepted,
       ready,
       collected,
     },
     activeSubscribers: activeSubCount || 0,
-    operationalReservations: operationalResCount || 0,
-    operationalTotalMeals: operationalTotalMeals,
+    operationalReservations: operationalResCount,
+    operationalTotalMeals,
     insights: {
       mostOrderedMeal,
       subscriptionOrders,
@@ -146,14 +141,12 @@ export const fetchDashboardMetrics = async (
   };
 };
 
-export const useDashboardMetrics = (calendarDate: string, resolvedOperationalDate: string, isResolving: boolean) => {
+export const useDashboardMetrics = (calendarDate: string, resolvedOperationalDate: string, isResolving: boolean, stallId?: string) => {
   return useQuery({
-    queryKey: ['dashboard_metrics', calendarDate, resolvedOperationalDate],
-    queryFn: () => {
-      return fetchDashboardMetrics(calendarDate, resolvedOperationalDate);
-    },
+    queryKey: dashboardKeys.summary(stallId || 'default', resolvedOperationalDate),
+    queryFn: () => fetchDashboardMetrics(calendarDate, resolvedOperationalDate, stallId),
     enabled: !isResolving,
-    refetchInterval: 30000, // Refresh every 30 seconds for live feel
+    staleTime: 5000,
   });
 };
 
@@ -167,7 +160,7 @@ export interface OperationalReservationDetails {
     customerName: string;
     phone: string;
     orderNumber: string;
-    reservedMeals: string[]; // List of meal names
+    reservedMeals: string[];
     quantity: number;
     expectedPickupSlot?: string;
   }[];
@@ -179,16 +172,16 @@ export const fetchOperationalReservationsDetailed = async (
   stallId?: string
 ): Promise<OperationalReservationDetails> => {
   const actualStallId = stallId || await getPrimaryStallId();
+  const operationsDate = resolvedOperationalDate;
 
-  // Fetch all orders for operational date & check holiday
   const [orders, holidayOperational] = await Promise.all([
     fetchOrders({
       stallId: actualStallId,
-      date: resolvedOperationalDate,
+      date: operationsDate,
       includeCancelled: false,
       statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
     }),
-    getHolidayForDate(resolvedOperationalDate, actualStallId)
+    getHolidayForDate(operationsDate, actualStallId)
   ]);
 
   let totalMealsReserved = 0;
@@ -229,11 +222,11 @@ export const fetchOperationalReservationsDetailed = async (
   };
 };
 
-export const useOperationalReservationsDetailed = (resolvedOperationalDate: string, isResolving: boolean) => {
+export const useOperationalReservationsDetailed = (resolvedOperationalDate: string, isResolving: boolean, stallId?: string) => {
   return useQuery({
-    queryKey: ['operational_reservations_detailed', resolvedOperationalDate],
-    queryFn: () => fetchOperationalReservationsDetailed(resolvedOperationalDate),
+    queryKey: dashboardKeys.preparation(stallId || 'default', resolvedOperationalDate),
+    queryFn: () => fetchOperationalReservationsDetailed(resolvedOperationalDate, stallId),
     enabled: !isResolving,
-    refetchInterval: 60000,
+    staleTime: 5000,
   });
 };

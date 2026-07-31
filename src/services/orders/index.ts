@@ -1,5 +1,6 @@
 import { supabase } from '@/src/lib/supabase';
 import { Order, OrderItem } from '@/src/types/models';
+import { AppError } from '@/src/utils/errors';
 
 export const getPrimaryStallId = async (): Promise<string> => {
   const { data, error } = await supabase
@@ -131,6 +132,25 @@ export const fetchOrders = async (options: FetchOrdersOptions): Promise<Order[]>
 };
 
 export const updateOrderStatus = async (orderId: string, status: Order['status']): Promise<void> => {
+  // 1. Validate Cash Order Collection Rule
+  if (status === 'picked_up' || status === 'delivered') {
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .select('payment_method, payment_status')
+      .eq('id', orderId)
+      .single();
+      
+    if (orderError) throw orderError;
+    
+    if (orderData.payment_method === 'cash' && orderData.payment_status !== 'paid') {
+      throw new AppError(
+        'CASH_PAYMENT_REQUIRED',
+        'Mark this cash order as paid before collecting it.'
+      );
+    }
+  }
+
+  // 2. Perform the update
   const { data, error } = await supabase
     .from('orders')
     .update({ status })

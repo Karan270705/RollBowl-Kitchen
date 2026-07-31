@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { Order, OrderItem } from '@/src/types/models';
 import { useUpdateOrderStatus, useUpdateOrderPaymentStatus } from '@/src/hooks/useOrders';
+import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { PaymentProofViewerModal } from '../payments/PaymentProofViewerModal';
 
 interface OrderCardProps {
@@ -11,8 +12,9 @@ interface OrderCardProps {
 }
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
-  const { mutate: updateStatus, isPending } = useUpdateOrderStatus();
-  const { mutate: updatePaymentStatus, isPending: isPaymentPending } = useUpdateOrderPaymentStatus();
+  const { stallId, resolvedOperationalDate } = useOperationalContext(order.stallId);
+  const { mutate: updateStatus, isPending } = useUpdateOrderStatus(stallId, resolvedOperationalDate);
+  const { mutate: updatePaymentStatus, isPending: isPaymentPending } = useUpdateOrderPaymentStatus(stallId, resolvedOperationalDate);
   const [isProofModalVisible, setIsProofModalVisible] = useState(false);
 
   const isUpiOrder = order.paymentMethod === 'upi';
@@ -39,9 +41,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
   const action = getNextAction();
 
   const isAcceptAction = action && action.nextStatus === 'confirmed';
+  const isCollectAction = action && action.nextStatus === 'picked_up';
+  
   const isUpiUnverified = isUpiOrder && 
     order.paymentVerificationStatus !== 'verified' && 
     order.paymentVerificationStatus !== 'not_required';
+    
+  const isCashUnpaid = order.paymentMethod === 'cash' && order.paymentStatus !== 'paid';
+
   const showAcceptButton = action && !(isAcceptAction && isUpiUnverified);
 
   const handleAction = () => {
@@ -182,16 +189,33 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
 
           {showAcceptButton && (
             <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: action.color }]}
+              style={[
+                styles.actionButton, 
+                { backgroundColor: (isCollectAction && isCashUnpaid) ? Colors.surfaceHighlight : (action?.color || Colors.primary) }
+              ]}
               onPress={handleAction}
-              disabled={isPending}
+              disabled={isPending || !!(isCollectAction && isCashUnpaid)}
             >
               {isPending ? (
                 <ActivityIndicator color={Colors.background} size="small" />
               ) : (
-                <Text style={styles.actionText}>{action.label}</Text>
+                <Text style={[
+                  styles.actionText,
+                  (isCollectAction && isCashUnpaid) && { color: Colors.textSecondary }
+                ]}>
+                  {action.label}
+                </Text>
               )}
             </TouchableOpacity>
+          )}
+
+          {isCollectAction && isCashUnpaid && (
+            <View style={styles.disabledActionNote}>
+              <Ionicons name="warning-outline" size={14} color={Colors.warning} />
+              <Text style={[styles.disabledActionNoteText, { color: Colors.warning }]}>
+                Mark this cash order as paid before collecting it.
+              </Text>
+            </View>
           )}
 
           {isAcceptAction && isUpiUnverified && (

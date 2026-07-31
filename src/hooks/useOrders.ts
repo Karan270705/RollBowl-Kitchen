@@ -1,84 +1,63 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchOrders, updateOrderStatus, updateOrderPaymentStatus } from '../services/orders';
 import { Order } from '../types/models';
+import { dashboardKeys, ordersKeys } from '../constants/queryKeys';
+import { normalizeError } from '../utils/errors';
+import { Alert } from 'react-native';
 
-export const ORDER_KEYS = {
-  all: ['orders'] as const,
-  list: (stallId?: string) => [...ORDER_KEYS.all, 'list', stallId] as const,
-};
-
-export const useOrders = (stallId?: string) => {
+export const useOrders = (stallId: string | undefined, operationsDate: string | undefined) => {
   return useQuery({
-    queryKey: ORDER_KEYS.list(stallId),
-    queryFn: () => fetchOrders({ stallId, includeFuture: true, includeCancelled: false }),
-    refetchInterval: 15000, // Poll every 15 seconds for new orders
+    queryKey: stallId && operationsDate ? ordersKeys.list(stallId, operationsDate) : ['orders', 'skip'],
+    queryFn: () => fetchOrders({ stallId, date: operationsDate, includeCancelled: false }),
+    refetchInterval: 15000,
+    enabled: !!stallId && !!operationsDate,
   });
 };
 
-export const useUpdateOrderStatus = () => {
+export const useUpdateOrderStatus = (stallId: string | undefined, operationsDate: string | undefined) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: Order['status'] }) => 
       updateOrderStatus(orderId, status),
-    onMutate: async ({ orderId, status }) => {
-      await queryClient.cancelQueries({ queryKey: ORDER_KEYS.all });
-
-      // Snapshot the previous value
-      const previousOrders = queryClient.getQueriesData<Order[]>({ queryKey: ORDER_KEYS.all });
-
-      // Optimistically update
-      queryClient.setQueriesData<Order[]>({ queryKey: ORDER_KEYS.all }, (oldData) => {
-        if (!oldData) return [];
-        return oldData.map(order => 
-          order.id === orderId ? { ...order, status } : order
-        );
-      });
-
-      return { previousOrders };
+    onMutate: async () => {
+      // No optimistic updates because we must wait for backend validation (e.g., cash guard)
+      return {};
     },
-    onError: (_err, _variables, context) => {
-      if (context?.previousOrders) {
-        context.previousOrders.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
+    onError: (err) => {
+      const message = normalizeError(err);
+      Alert.alert('Action Failed', message);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ORDER_KEYS.all });
+      if (stallId && operationsDate) {
+        queryClient.invalidateQueries({ queryKey: ordersKeys.list(stallId, operationsDate) });
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.summary(stallId, operationsDate) });
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.mostOrdered(stallId, operationsDate) });
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.paymentBreakdown(stallId, operationsDate) });
+      }
     },
   });
 };
 
-export const useUpdateOrderPaymentStatus = () => {
+export const useUpdateOrderPaymentStatus = (stallId: string | undefined, operationsDate: string | undefined) => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: Order['paymentStatus'] }) => 
       updateOrderPaymentStatus(orderId, status),
-    onMutate: async ({ orderId, status }) => {
-      await queryClient.cancelQueries({ queryKey: ORDER_KEYS.all });
-
-      const previousOrders = queryClient.getQueriesData<Order[]>({ queryKey: ORDER_KEYS.all });
-
-      queryClient.setQueriesData<Order[]>({ queryKey: ORDER_KEYS.all }, (oldData) => {
-        if (!oldData) return [];
-        return oldData.map(order => 
-          order.id === orderId ? { ...order, paymentStatus: status } : order
-        );
-      });
-
-      return { previousOrders };
+    onMutate: async () => {
+      return {};
     },
-    onError: (_err, _variables, context) => {
-      if (context?.previousOrders) {
-        context.previousOrders.forEach(([queryKey, data]) => {
-          queryClient.setQueryData(queryKey, data);
-        });
-      }
+    onError: (err) => {
+      const message = normalizeError(err);
+      Alert.alert('Action Failed', message);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ORDER_KEYS.all });
+      if (stallId && operationsDate) {
+        queryClient.invalidateQueries({ queryKey: ordersKeys.list(stallId, operationsDate) });
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.summary(stallId, operationsDate) });
+        queryClient.invalidateQueries({ queryKey: dashboardKeys.paymentBreakdown(stallId, operationsDate) });
+      }
     },
   });
 };

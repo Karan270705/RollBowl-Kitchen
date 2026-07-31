@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { OrderCard } from '@/src/components/orders/OrderCard';
 import { useOrders } from '@/src/hooks/useOrders';
+import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { Order } from '@/src/types/models';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -12,7 +13,8 @@ type TypeFilter = 'all' | 'direct' | 'subscription';
 
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
-  const { data: orders = [], isLoading } = useOrders();
+  const { stallId, resolvedOperationalDate } = useOperationalContext();
+  const { data: orders = [], isLoading } = useOrders(stallId, resolvedOperationalDate);
 
   const [sectionFilter, setSectionFilter] = useState<SectionFilter>('active');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');

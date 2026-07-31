@@ -10,6 +10,7 @@ import {
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { useOperationalMenuStatus } from '@/src/hooks/useMenu';
 import { useDashboardMetrics } from '@/src/services/dashboard';
+import { useDashboardRealtime } from '@/src/hooks/useDashboardRealtime';
 import { EmptyState } from '@/src/components/ui';
 import { useRouter } from 'expo-router';
 
@@ -18,10 +19,13 @@ export default function DashboardScreen() {
   const user = useUser();
   const router = useRouter();
 
-  const { calendarDate, resolvedOperationalDate, isResolving } = useOperationalContext();
+  const { stallId, calendarDate, resolvedOperationalDate, isResolving } = useOperationalContext();
+
+  // Initialize Realtime subscription
+  useDashboardRealtime(stallId, resolvedOperationalDate);
 
   const { data: menuStatus } = useOperationalMenuStatus(resolvedOperationalDate, isResolving);
-  const { data: metrics, isPending, isLoading, error } = useDashboardMetrics(calendarDate, resolvedOperationalDate, isResolving);
+  const { data: metrics, isPending, isLoading, error } = useDashboardMetrics(calendarDate, resolvedOperationalDate, isResolving, stallId);
 
   const greeting = getGreeting();
 

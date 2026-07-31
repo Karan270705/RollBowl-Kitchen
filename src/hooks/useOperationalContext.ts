@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { resolveSharedOperationalDate, OperationalContextResult, DEFAULT_RESOLVING_CONTEXT } from '../utils/operationalDate';
 
-export function useOperationalContext(stallId?: string): OperationalContextResult {
+export function useOperationalContext(stallId?: string): OperationalContextResult & { stallId?: string } {
   const { data } = useQuery({
     queryKey: ['operational-context', stallId],
     queryFn: async () => {
@@ -17,5 +17,5 @@ export function useOperationalContext(stallId?: string): OperationalContextResul
     retry: 2,
   });
 
-  return data ?? DEFAULT_RESOLVING_CONTEXT;
+  return { ...(data ?? DEFAULT_RESOLVING_CONTEXT), stallId: data?.stallId || stallId };
 }
