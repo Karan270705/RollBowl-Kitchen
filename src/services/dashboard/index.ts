@@ -23,6 +23,8 @@ export interface DashboardMetrics {
     cashOrders: number;
     pendingRequiresAttention: number; // Pending for > 15 mins
   };
+  sourceOrderIds: string[];
+  lastBackendFetchAt: string;
   holidayExecution: KitchenHoliday | null;
   holidayOperational: KitchenHoliday | null;
 }
@@ -109,7 +111,7 @@ export const fetchDashboardMetrics = async (
   }
 
   // 5. Most Ordered Meal (Operations dataset)
-  let mostOrderedMeal: string | null = null;
+  let mostOrderedMeal: string | null = 'No orders yet';
   const mealCounts: Record<string, number> = {};
 
   for (const order of executionOrdersList) {
@@ -128,6 +130,14 @@ export const fetchDashboardMetrics = async (
       mostOrderedMeal = mealName;
     }
   }
+  if (total === 0 || max === 0) {
+    mostOrderedMeal = 'No orders yet';
+  }
+
+  const sourceOrderIds = executionOrdersList
+    .filter((o) => o.status !== 'cancelled')
+    .map((o) => o.id)
+    .sort();
 
   return {
     executionOrders: {
@@ -146,6 +156,8 @@ export const fetchDashboardMetrics = async (
       cashOrders,
       pendingRequiresAttention,
     },
+    sourceOrderIds,
+    lastBackendFetchAt: new Date().toISOString(),
     holidayExecution,
     holidayOperational,
   };
@@ -159,7 +171,7 @@ export const useDashboardMetrics = (
   stallId?: string
 ) => {
   return useQuery({
-    queryKey: dashboardKeys.summary(stallId || 'default', `${resolvedOperationalDate || 'null'}_${preparationDate}`),
+    queryKey: dashboardKeys.summary(stallId || 'default', resolvedOperationalDate),
     queryFn: () => fetchDashboardMetrics(calendarDate, resolvedOperationalDate, preparationDate, stallId),
     enabled: !isResolving,
     staleTime: 5000,

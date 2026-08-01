@@ -25,7 +25,7 @@ export const useAddHoliday = () => {
       addHoliday(params),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['kitchen_holidays'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard_metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['tomorrow_reservations_detailed'] });
       queryClient.invalidateQueries({ queryKey: ['subscribers_list'] });
     },
@@ -40,7 +40,7 @@ export const useUpdateHolidayStatus = () => {
       updateHolidayStatus(id, isActive),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kitchen_holidays'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard_metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['tomorrow_reservations_detailed'] });
       queryClient.invalidateQueries({ queryKey: ['subscribers_list'] });
     },

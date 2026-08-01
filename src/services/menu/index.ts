@@ -145,6 +145,20 @@ export const saveMenuMeals = async (scheduleId: string, mealIds: string[]): Prom
     .upsert(insertData, { onConflict: 'menu_schedule_id, meal_id' });
 
   if (error) throw error;
+
+  const { data: schedule } = await supabase
+    .from('menu_schedules')
+    .select('menu_date, is_published')
+    .eq('id', scheduleId)
+    .maybeSingle();
+
+  console.log('[MENU PUBLISH RESULT]', JSON.stringify({
+    menuId: scheduleId,
+    serviceDate: schedule?.menu_date || '',
+    isPublished: schedule?.is_published ?? true,
+    itemCount: mealIds.length,
+    timestamp: new Date().toISOString()
+  }, null, 2));
 };
 
 export const removeMealFromMenu = async (scheduleId: string, mealId: string): Promise<void> => {

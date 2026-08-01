@@ -1,6 +1,7 @@
 import { supabase } from '@/src/lib/supabase';
 import { Order, OrderItem } from '@/src/types/models';
 import { AppError } from '@/src/utils/errors';
+import { getDeviceId } from '@/src/utils/device';
 
 export const getPrimaryStallId = async (): Promise<string> => {
   const { data, error } = await supabase
@@ -103,7 +104,7 @@ export const fetchOrders = async (options: FetchOrdersOptions): Promise<Order[]>
     return acc;
   }, {});
 
-  return ordersData.map((row: any): Order => ({
+  const orders = ordersData.map((row: any): Order => ({
     id: row.id,
     orderNumber: row.order_number,
     userId: row.user_id,
@@ -129,6 +130,76 @@ export const fetchOrders = async (options: FetchOrdersOptions): Promise<Order[]>
     updatedAt: row.updated_at,
     items: itemsByOrderId[row.id] || [],
   }));
+
+  logAuthoritativeState(orders, actualStallId, options.date);
+  return orders;
+};
+
+export const logAuthoritativeState = (
+  orders: Order[],
+  stallId: string,
+  operationalDate?: string | null
+): void => {
+  const nonCancelled = orders.filter((o) => o.status !== 'cancelled');
+  const sourceOrderIds = nonCancelled.map((o) => o.id).sort();
+
+  let total = 0;
+  let pending = 0;
+  let accepted = 0;
+  let ready = 0;
+  let collected = 0;
+  let cashOrders = 0;
+  let subscriptionOrders = 0;
+  const mealCounts: Record<string, number> = {};
+
+  for (const order of nonCancelled) {
+    total++;
+    if (order.status === 'pending') pending++;
+    else if (order.status === 'confirmed' || order.status === 'preparing') accepted++;
+    else if (order.status === 'ready') ready++;
+    else if (order.status === 'picked_up' || order.status === 'delivered') collected++;
+
+    if (order.paymentMethod === 'cash') cashOrders++;
+    if (order.orderType === 'subscription') subscriptionOrders++;
+
+    if (order.items) {
+      for (const item of order.items) {
+        mealCounts[item.mealName] = (mealCounts[item.mealName] || 0) + item.quantity;
+      }
+    }
+  }
+
+  let max = 0;
+  let mostOrdered: string | null = null;
+  for (const [mealName, qty] of Object.entries(mealCounts)) {
+    if (qty > max) {
+      max = qty;
+      mostOrdered = mealName;
+    }
+  }
+
+  console.log(
+    '[KITCHEN AUTHORITATIVE STATE]',
+    JSON.stringify(
+      {
+        deviceId: getDeviceId(),
+        stallId,
+        operationalDate: operationalDate || 'all',
+        sourceOrderIds,
+        total,
+        pending,
+        accepted,
+        ready,
+        collected,
+        cashOrders,
+        subscriptionOrders,
+        mostOrdered,
+        fetchedAt: new Date().toISOString(),
+      },
+      null,
+      2
+    )
+  );
 };
 
 export const updateOrderStatus = async (orderId: string, status: Order['status']): Promise<void> => {

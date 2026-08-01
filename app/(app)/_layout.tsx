@@ -2,8 +2,13 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing } from '@/src/constants/theme';
+import { useOperationalContext } from '@/src/hooks/useOperationalContext';
+import { useDashboardRealtime } from '@/src/hooks/useDashboardRealtime';
 
 export default function AppLayout() {
+  const { stallId, resolvedOperationalDate } = useOperationalContext();
+  useDashboardRealtime(stallId, resolvedOperationalDate);
+
   return (
     <Tabs
       screenOptions={{

@@ -132,7 +132,14 @@ export default function MenuScreen() {
       />
 
       <View style={styles.contentHeader}>
-        <Text style={styles.dateLabel}>{formattedHeaderDate}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <Text style={styles.dateLabel}>{formattedHeaderDate}</Text>
+          {schedule?.isPublished && items.length > 0 && (
+            <View style={{ backgroundColor: Colors.success + '20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1, borderColor: Colors.success }}>
+              <Text style={{ color: Colors.success, fontSize: 12, fontFamily: Typography.family.bold }}>PUBLISHED</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.itemCount}>
           {menuLoading ? '...' : `${items.length} Items`}
         </Text>

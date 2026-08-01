@@ -95,35 +95,35 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
               <Text style={styles.slotText}>{order.expectedPickupSlot}</Text>
             </View>
           )}
-          {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' ? (
+          {order.paymentMethod === 'cash' && order.paymentStatus !== 'paid' ? (
             <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
-              <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>💵 CASH</Text>
+              <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>Cash • Unpaid</Text>
             </View>
           ) : order.paymentMethod === 'upi' ? (
             order.paymentVerificationStatus === 'pending' ? (
               <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
-                <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>⏳ UPI Pending</Text>
+                <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>UPI • Verification pending</Text>
               </View>
             ) : order.paymentVerificationStatus === 'verified' || order.paymentStatus === 'paid' ? (
               <View style={[styles.slotBadge, { backgroundColor: Colors.success + '20', borderColor: Colors.success }]}>
-                <Text style={[styles.slotText, { color: Colors.success, fontFamily: Typography.family.bold }]}>✅ UPI Paid</Text>
+                <Text style={[styles.slotText, { color: Colors.success, fontFamily: Typography.family.bold }]}>UPI • Paid</Text>
               </View>
             ) : order.paymentVerificationStatus === 'rejected' ? (
               <View style={[styles.slotBadge, { backgroundColor: Colors.error + '20', borderColor: Colors.error }]}>
-                <Text style={[styles.slotText, { color: Colors.error, fontFamily: Typography.family.bold }]}>❌ UPI Rejected</Text>
+                <Text style={[styles.slotText, { color: Colors.error, fontFamily: Typography.family.bold }]}>UPI • Rejected</Text>
               </View>
             ) : order.paymentVerificationStatus === 'expired' ? (
               <View style={[styles.slotBadge, { backgroundColor: Colors.error + '20', borderColor: Colors.error }]}>
-                <Text style={[styles.slotText, { color: Colors.error, fontFamily: Typography.family.bold }]}>❌ UPI Expired</Text>
+                <Text style={[styles.slotText, { color: Colors.error, fontFamily: Typography.family.bold }]}>UPI • Expired</Text>
               </View>
             ) : (
               <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
-                <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>⏳ UPI Awaiting</Text>
+                <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>UPI • Awaiting proof</Text>
               </View>
             )
           ) : (order.paymentMethod === 'card' || order.paymentStatus === 'paid') ? (
             <View style={[styles.slotBadge, { backgroundColor: Colors.success + '20', borderColor: Colors.success }]}>
-              <Text style={[styles.slotText, { color: Colors.success, fontFamily: Typography.family.bold }]}>✅ Paid</Text>
+              <Text style={[styles.slotText, { color: Colors.success, fontFamily: Typography.family.bold }]}>Paid</Text>
             </View>
           ) : null}
         </View>

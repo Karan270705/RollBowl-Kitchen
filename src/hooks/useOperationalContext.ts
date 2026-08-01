@@ -10,6 +10,7 @@ import {
   getTomorrowISTDateString,
 } from '../utils/operationalDate';
 import { AppConfig } from '../constants/config';
+import { invalidateCanonicalOperationalQueries } from '../constants/queryKeys';
 
 // Calculate milliseconds until next rollover time (default 15:00 IST) using explicit epoch math
 function calculateMsUntilNextRollover(rolloverTimeStr = '15:00'): { delayMs: number; targetIST: string } {
@@ -93,8 +94,7 @@ export function useOperationalContext(stallId?: string): OperationalContextResul
       rolloverTimerRef.current = null;
       refetchRef.current?.();
       if (stallId) {
-        queryClient.invalidateQueries({ queryKey: ['dashboard_summary', stallId] });
-        queryClient.invalidateQueries({ queryKey: ['orders', 'list', stallId] });
+        invalidateCanonicalOperationalQueries(queryClient, stallId);
       }
       scheduleNextBoundary();
     }, delayMs);
@@ -121,8 +121,7 @@ export function useOperationalContext(stallId?: string): OperationalContextResul
         }
         refetchRef.current?.();
         if (stallId) {
-          queryClient.invalidateQueries({ queryKey: ['dashboard_summary', stallId] });
-          queryClient.invalidateQueries({ queryKey: ['orders', 'list', stallId] });
+          invalidateCanonicalOperationalQueries(queryClient, stallId);
         }
         scheduleNextBoundary();
       }

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
@@ -10,9 +10,9 @@ import {
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { useOperationalMenuStatus } from '@/src/hooks/useMenu';
 import { useDashboardMetrics } from '@/src/services/dashboard';
-import { useDashboardRealtime } from '@/src/hooks/useDashboardRealtime';
 import { EmptyState } from '@/src/components/ui';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { getDeviceId } from '@/src/utils/device';
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
@@ -21,11 +21,14 @@ export default function DashboardScreen() {
 
   const { stallId, calendarDate, resolvedOperationalDate, preparationDate, isResolving } = useOperationalContext();
 
-  // Initialize Realtime subscription
-  useDashboardRealtime(stallId, resolvedOperationalDate);
-
   const { data: menuStatus } = useOperationalMenuStatus(preparationDate, isResolving);
-  const { data: metrics, isPending, isLoading, error } = useDashboardMetrics(calendarDate, resolvedOperationalDate, preparationDate, isResolving, stallId);
+  const { data: metrics, isPending, isLoading, error, refetch } = useDashboardMetrics(calendarDate, resolvedOperationalDate, preparationDate, isResolving, stallId);
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const greeting = getGreeting();
 
@@ -38,7 +41,7 @@ export default function DashboardScreen() {
     metricsError: error ? (error as any).message || String(error) : null,
   }, null, 2));
 
-  if (isResolving || isPending) {
+  if (isResolving || (isPending && !metrics)) {
     return (
       <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center' }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -49,11 +52,30 @@ export default function DashboardScreen() {
   if (error || !metrics) {
     console.error("Dashboard Load Error:", error);
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <EmptyState icon="alert-circle-outline" title="Dashboard Error" subtitle="Failed to load live metrics." />
-      </View>
+      <ScrollView
+        style={[styles.container, { paddingTop: insets.top }]}
+        refreshControl={<RefreshControl refreshing={isPending} onRefresh={refetch} tintColor={Colors.primary} />}
+      >
+        <EmptyState icon="alert-circle-outline" title="Dashboard Error" subtitle="Dashboard could not refresh. Pull to retry." />
+      </ScrollView>
     );
   }
+
+  console.log('[KITCHEN SYNC DEBUG PANEL]', JSON.stringify({
+    deviceLabel: getDeviceId(),
+    authenticatedUserId: user?.id || null,
+    stallId,
+    operationalDate: resolvedOperationalDate,
+    realtimeChannel: stallId && resolvedOperationalDate ? `kitchen-dashboard:${stallId}:${resolvedOperationalDate}` : null,
+    realtimeStatus: 'SUBSCRIBED',
+    totalOrders: metrics.executionOrders.total,
+    pending: metrics.executionOrders.pending,
+    accepted: metrics.executionOrders.accepted,
+    ready: metrics.executionOrders.ready,
+    collected: metrics.executionOrders.collected,
+    sourceOrderIds: metrics.sourceOrderIds,
+    lastBackendFetchAt: metrics.lastBackendFetchAt,
+  }, null, 2));
 
   const renderExecutionSection = () => (
     <View style={styles.sectionContainer}>
@@ -215,6 +237,7 @@ export default function DashboardScreen() {
         { paddingTop: insets.top + Spacing.base, paddingBottom: Spacing['3xl'] },
       ]}
       showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={isPending} onRefresh={refetch} tintColor={Colors.primary} />}
     >
       {/* Header */}
       <View style={styles.header}>

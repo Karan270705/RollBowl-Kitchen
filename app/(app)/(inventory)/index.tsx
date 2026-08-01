@@ -186,8 +186,8 @@ export default function InventoryScreen() {
         ) : sortedBatches?.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="cube-outline" size={48} color={Colors.textTertiary} />
-            <Text style={styles.emptyStateTitle}>No Batches Found</Text>
-            <Text style={styles.emptyStateDesc}>There are no inventory batches scheduled for this date.</Text>
+            <Text style={styles.emptyStateTitle}>Inventory Not Configured</Text>
+            <Text style={styles.emptyStateDesc}>Inventory tracking not configured for this date.</Text>
           </View>
         ) : (
           sortedBatches?.map((batch, index) => {

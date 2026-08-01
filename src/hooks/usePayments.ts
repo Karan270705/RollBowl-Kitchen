@@ -56,6 +56,7 @@ export const useVerifyOrderPayment = () => {
       queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.proofForOrder(variables.orderId) });
       // Invalidate all orders
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 };
@@ -69,6 +70,7 @@ export const useRejectOrderPayment = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.proofForOrder(variables.orderId) });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 };

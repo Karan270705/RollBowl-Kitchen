@@ -62,35 +62,24 @@ export async function resolveSharedOperationalDate(stallId?: string): Promise<Op
   const rolloverCutoff = parseTimeToDateIST(calendarDate, rolloverTimeStr);
   const beforeOrAfterRollover = currentIST.getTime() <= rolloverCutoff.getTime() ? 'BEFORE_ROLLOVER' : 'AFTER_ROLLOVER';
 
-  // Find next upcoming published menu or batch date for preparationDate
-  const [{ data: upcomingBatches }, { data: upcomingMenus }] = await Promise.all([
-    supabase
-      .from('inventory_batches')
-      .select('id, inventory_date')
-      .eq('stall_id', stallId || '')
-      .gt('inventory_date', calendarDate)
-      .neq('status', 'cancelled')
-      .order('inventory_date', { ascending: true })
-      .limit(1),
-    supabase
-      .from('menu_schedules')
-      .select('id, menu_date')
-      .eq('stall_id', stallId || '')
-      .eq('is_published', true)
-      .gt('menu_date', calendarDate)
-      .order('menu_date', { ascending: true })
-      .limit(1)
-  ]);
+  // Find next upcoming published menu date for preparationDate (independent of inventory batches)
+  let menuQuery = supabase
+    .from('menu_schedules')
+    .select('id, menu_date')
+    .eq('is_published', true)
+    .gt('menu_date', calendarDate)
+    .order('menu_date', { ascending: true })
+    .limit(1);
+
+  if (stallId) {
+    menuQuery = menuQuery.eq('stall_id', stallId);
+  }
+
+  const { data: upcomingMenus } = await menuQuery;
 
   let nextValidServiceDate: string | null = null;
-  if (upcomingBatches && upcomingBatches.length > 0) {
-    nextValidServiceDate = upcomingBatches[0].inventory_date;
-  }
   if (upcomingMenus && upcomingMenus.length > 0) {
-    const menuDate = upcomingMenus[0].menu_date;
-    if (!nextValidServiceDate || menuDate < nextValidServiceDate) {
-      nextValidServiceDate = menuDate;
-    }
+    nextValidServiceDate = upcomingMenus[0].menu_date;
   }
 
   const preparationDate = nextValidServiceDate || tomorrowStr;

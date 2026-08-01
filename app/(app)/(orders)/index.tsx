@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { OrderCard } from '@/src/components/orders/OrderCard';
@@ -7,6 +7,7 @@ import { useOrders } from '@/src/hooks/useOrders';
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { Order } from '@/src/types/models';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 
 type SectionFilter = 'active' | 'completed';
 type TypeFilter = 'all' | 'direct' | 'subscription';
@@ -14,7 +15,13 @@ type TypeFilter = 'all' | 'direct' | 'subscription';
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const { stallId, resolvedOperationalDate } = useOperationalContext();
-  const { data: orders = [], isLoading } = useOrders(stallId, resolvedOperationalDate);
+  const { data: orders = [], isLoading, refetch, isRefetching } = useOrders(stallId, resolvedOperationalDate);
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const [sectionFilter, setSectionFilter] = useState<SectionFilter>('active');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
@@ -103,7 +110,11 @@ export default function OrdersScreen() {
           <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : (
-        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+        <ScrollView 
+          style={styles.list} 
+          contentContainerStyle={styles.listContent}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
+        >
           {groupedOrders.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="receipt-outline" size={48} color={Colors.textTertiary} />
