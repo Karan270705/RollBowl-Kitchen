@@ -202,6 +202,29 @@ export const logAuthoritativeState = (
   );
 };
 
+const parseAcceptOrderError = (error: any): Error => {
+  const message = error?.message || error?.details || String(error);
+  if (message.includes('INSUFFICIENT_SUBSCRIPTION_CREDITS') || message.includes('INSUFFICIENT_CREDITS')) {
+    return new Error('Customer has insufficient subscription credits remaining.');
+  }
+  if (message.includes('DAILY_CREDIT_LIMIT_EXCEEDED')) {
+    return new Error('Order exceeds customer\'s daily subscription credit limit at acceptance.');
+  }
+  if (message.includes('SUBSCRIPTION_NOT_ACTIVE')) {
+    return new Error('Customer\'s subscription is not active.');
+  }
+  if (message.includes('SUBSCRIPTION_DATE_INVALID')) {
+    return new Error('Order service date falls outside subscription validity duration.');
+  }
+  if (message.includes('SUBSCRIPTION_RESERVATION_MISSING')) {
+    return new Error('Subscription reservation missing for this order.');
+  }
+  if (message.includes('INVALID_RESERVATION_STATUS')) {
+    return new Error('Subscription credit reservation is no longer in reserved status.');
+  }
+  return new Error(error?.message || 'Failed to accept order.');
+};
+
 export const updateOrderStatus = async (orderId: string, status: Order['status']): Promise<void> => {
   // 1. Validate Cash Order Collection Rule
   if (status === 'picked_up' || status === 'delivered') {
@@ -221,7 +244,36 @@ export const updateOrderStatus = async (orderId: string, status: Order['status']
     }
   }
 
-  // 2. Perform the update
+  // 2. Authoritative Kitchen Acceptance via RPC when status is confirmed
+  if (status === 'confirmed') {
+    const { data, error } = await supabase.rpc('accept_order', {
+      p_order_id: orderId,
+    });
+
+    if (error) {
+      throw parseAcceptOrderError(error);
+    }
+
+    // Trigger customer notification asynchronously (non-blocking)
+    (async () => {
+      try {
+        const { data: orderRow } = await supabase
+          .from('orders')
+          .select('user_id, order_number')
+          .eq('id', orderId)
+          .single();
+        if (orderRow) {
+          await notifyOrderStatusChanged(orderRow.user_id, orderRow.order_number, orderId, 'confirmed');
+        }
+      } catch (err: any) {
+        console.error('Failed to notify customer on order confirmation:', err);
+      }
+    })();
+
+    return;
+  }
+
+  // 3. Perform standard update for other lifecycle transitions (preparing, ready, collected, etc.)
   const { data, error } = await supabase
     .from('orders')
     .update({ status })

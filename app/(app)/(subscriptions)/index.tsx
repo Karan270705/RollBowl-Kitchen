@@ -425,7 +425,7 @@ export default function SubscriptionsScreen() {
                     <View style={styles.detailItem}>
                       <Ionicons name="nutrition-outline" size={14} color={Colors.textTertiary} />
                       <Text style={[styles.detailText, { fontFamily: Typography.family.semiBold, color: Colors.textPrimary }]}>
-                        {sub.remainingMeals} Credits Remaining
+                        {sub.remainingMeals} / {sub.totalMeals} Credits Remaining ({sub.consumedMeals} Consumed)
                       </Text>
                     </View>
                   </View>

@@ -8,6 +8,9 @@ export interface SubscriberListItem {
   planName: string;
   status: 'active' | 'paused' | 'expired' | 'cancelled';
   remainingMeals: number;
+  totalMeals: number;
+  consumedMeals: number;
+  mealsPerDay: number;
   startDate: string;
   endDate: string;
   email?: string;
@@ -15,9 +18,6 @@ export interface SubscriberListItem {
 }
 
 export interface SubscriberDetails extends SubscriberListItem {
-  totalMeals: number;
-  consumedMeals: number;
-  mealsPerDay: number;
   extendedDays: number;
   usageHistory: {
     id: string;
@@ -36,6 +36,9 @@ export const fetchSubscribersList = async (): Promise<SubscriberListItem[]> => {
       plan_name,
       status,
       remaining_meals,
+      total_meals,
+      consumed_meals,
+      meals_per_day,
       start_date,
       end_date,
       users (
@@ -56,7 +59,10 @@ export const fetchSubscribersList = async (): Promise<SubscriberListItem[]> => {
       customerName: rawName ? rawName : 'No Profile Name',
       planName: sub.plan_name,
       status: sub.status,
-      remainingMeals: sub.remaining_meals,
+      remainingMeals: sub.remaining_meals ?? 0,
+      totalMeals: sub.total_meals ?? 20,
+      consumedMeals: sub.consumed_meals ?? 0,
+      mealsPerDay: sub.meals_per_day ?? 1,
       startDate: sub.start_date,
       endDate: sub.end_date,
       email: sub.users?.email,
@@ -108,15 +114,15 @@ export const fetchSubscriberDetails = async (subscriptionId: string): Promise<Su
     customerName,
     planName: subData.plan_name,
     status: subData.status,
-    remainingMeals: subData.remaining_meals,
+    remainingMeals: subData.remaining_meals ?? 0,
     startDate: subData.start_date,
     endDate: subData.end_date,
     email: subData.users?.email,
     phone: subData.users?.phone,
-    totalMeals: subData.total_meals,
-    consumedMeals: subData.consumed_meals,
-    mealsPerDay: subData.meals_per_day,
-    extendedDays: subData.extended_days,
+    totalMeals: subData.total_meals ?? 20,
+    consumedMeals: subData.consumed_meals ?? 0,
+    mealsPerDay: subData.meals_per_day ?? 1,
+    extendedDays: subData.extended_days ?? 0,
     usageHistory: (historyData || []).map((item: any) => ({
       id: item.id,
       mealName: item.meal_name,
