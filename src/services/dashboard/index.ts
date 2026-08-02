@@ -3,6 +3,7 @@ import { getPrimaryStallId } from '@/src/services/menu';
 import { useQuery } from '@tanstack/react-query';
 import { Order, KitchenHoliday } from '@/src/types/models';
 import { fetchOrders } from '@/src/services/orders';
+import { fetchWalkInSales } from '@/src/services/inventory';
 import { getHolidayForDate } from '@/src/services/holidays';
 import { dashboardKeys } from '@/src/constants/queryKeys';
 
@@ -21,6 +22,8 @@ export interface DashboardMetrics {
     mostOrderedMeal: string | null;
     subscriptionOrders: number;
     cashOrders: number;
+    walkInSales: number;
+    walkInRevenue: number;
     pendingRequiresAttention: number; // Pending for > 15 mins
   };
   sourceOrderIds: string[];
@@ -38,8 +41,8 @@ export const fetchDashboardMetrics = async (
   const actualStallId = stallId || await getPrimaryStallId();
   const operationsDate = resolvedOperationalDate;
 
-  // 1. Fetch Execution Orders (Operations dataset) & Holidays
-  const [executionOrdersList, holidayExecution, holidayOperational] = await Promise.all([
+  // 1. Fetch Execution Orders (Operations dataset), Walk-in Sales & Holidays
+  const [executionOrdersList, walkInSalesList, holidayExecution, holidayOperational] = await Promise.all([
     operationsDate
       ? fetchOrders({
           stallId: actualStallId,
@@ -47,6 +50,9 @@ export const fetchDashboardMetrics = async (
           includeCancelled: true,
         })
       : Promise.resolve([] as Order[]),
+    operationsDate
+      ? fetchWalkInSales(actualStallId, operationsDate)
+      : Promise.resolve([]),
     operationsDate
       ? getHolidayForDate(operationsDate, actualStallId)
       : Promise.resolve(null),
@@ -110,7 +116,18 @@ export const fetchDashboardMetrics = async (
     }
   }
 
-  // 5. Most Ordered Meal (Operations dataset)
+  // 5. Walk-in Sales Metrics
+  let walkInSalesCount = 0;
+  let walkInRevenue = 0;
+  for (const walkIn of walkInSalesList) {
+    walkInSalesCount++;
+    walkInRevenue += walkIn.totalAmount;
+    // Count walk-in meals in the total collected and meal counts
+    collected++;
+    total++;
+  }
+
+  // 6. Most Ordered Meal (Operations dataset + Walk-in sales)
   let mostOrderedMeal: string | null = 'No orders yet';
   const mealCounts: Record<string, number> = {};
 
@@ -121,6 +138,11 @@ export const fetchDashboardMetrics = async (
         mealCounts[item.mealName] = (mealCounts[item.mealName] || 0) + item.quantity;
       }
     }
+  }
+
+  // Include walk-in meals
+  for (const walkIn of walkInSalesList) {
+    mealCounts[walkIn.mealName] = (mealCounts[walkIn.mealName] || 0) + walkIn.quantity;
   }
 
   let max = 0;
@@ -154,6 +176,8 @@ export const fetchDashboardMetrics = async (
       mostOrderedMeal,
       subscriptionOrders,
       cashOrders,
+      walkInSales: walkInSalesCount,
+      walkInRevenue,
       pendingRequiresAttention,
     },
     sourceOrderIds,

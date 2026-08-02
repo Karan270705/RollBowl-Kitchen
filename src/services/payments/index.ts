@@ -31,21 +31,27 @@ export interface SubscriptionPurchaseRequest {
   status: 'awaiting_proof' | 'verification_pending' | 'approved' | 'rejected' | 'cancelled';
   currentPaymentProofId?: string;
   requestedAt: string;
+  createdAt: string;
   approvedAt?: string;
   approvedBy?: string;
   rejectedAt?: string;
   rejectionReason?: string;
   createdSubscriptionId?: string;
+  planNameSnapshot?: string;
+  durationDaysSnapshot?: number;
+  totalMealsSnapshot?: number;
+  mealsPerDaySnapshot?: number;
+  baseAmountSnapshot?: number;
+  convenienceFeePercentSnapshot?: number;
+  convenienceFeeSnapshot?: number;
+  currencySnapshot?: string;
+  categoryCreditCostsSnapshot?: Record<string, number>;
+  featuresSnapshot?: string[];
   
-  // Joined tables
-  users?: {
-    name: string;
-    email: string;
-    phone: string;
-  };
-  subscription_plans?: {
-    name: string;
-  };
+  // Flattened customer identity
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
 }
 
 export const fetchPaymentProofForOrder = async (orderId: string): Promise<PaymentProof | null> => {
@@ -180,42 +186,89 @@ export const rejectOrderPayment = async (proofId: string, reason: string): Promi
 export const fetchSubscriptionPurchaseRequests = async (stallId?: string): Promise<SubscriptionPurchaseRequest[]> => {
   const actualStallId = stallId || await getPrimaryStallId();
   
+  const explicitSelect = `
+    id,
+    user_id,
+    stall_id,
+    plan_id,
+    status,
+    current_payment_proof_id,
+    plan_name_snapshot,
+    base_amount_snapshot,
+    convenience_fee_percent_snapshot,
+    convenience_fee_snapshot,
+    expected_amount,
+    currency_snapshot,
+    total_meals_snapshot,
+    duration_days_snapshot,
+    meals_per_day_snapshot,
+    category_credit_costs_snapshot,
+    features_snapshot,
+    approved_at,
+    approved_by,
+    rejected_at,
+    rejection_reason,
+    created_subscription_id,
+    requested_at,
+    created_at,
+    users!subscription_purchase_requests_user_id_fkey (
+      name,
+      email,
+      phone,
+      college_id
+    )
+  `.trim();
+
   const { data, error } = await supabase
     .from('subscription_purchase_requests')
-    .select(`
-      *,
-      users ( name, email, phone ),
-      subscription_plans ( name )
-    `)
+    .select(explicitSelect)
     .eq('stall_id', actualStallId)
-    .order('requested_at', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (error) throw error;
   if (!data) return [];
 
-  return data.map((row: any) => ({
-    id: row.id,
-    userId: row.user_id,
-    stallId: row.stall_id,
-    planId: row.plan_id,
-    expectedAmount: Number(row.expected_amount),
-    status: row.status,
-    currentPaymentProofId: row.current_payment_proof_id,
-    requestedAt: row.requested_at,
-    approvedAt: row.approved_at,
-    approvedBy: row.approved_by,
-    rejectedAt: row.rejected_at,
-    rejectionReason: row.rejection_reason,
-    createdSubscriptionId: row.created_subscription_id,
-    users: row.users ? {
-      name: row.users.name || 'No Profile Name',
-      email: row.users.email,
-      phone: row.users.phone,
-    } : undefined,
-    subscription_plans: row.subscription_plans ? {
-      name: row.subscription_plans.name,
-    } : undefined,
-  }));
+  return data.map((row: any) => {
+    // Log raw relation shape in development
+    if (__DEV__) {
+      console.log('[SUBSCRIPTION REQUEST USER RELATION]', JSON.stringify(row.users, null, 2));
+    }
+
+    // Support both possible PostgREST relation shapes (object or array)
+    const userRelation = Array.isArray(row.users)
+      ? row.users[0]
+      : row.users;
+
+    return {
+      id: row.id,
+      userId: row.user_id,
+      stallId: row.stall_id,
+      planId: row.plan_id,
+      expectedAmount: Number(row.expected_amount),
+      status: row.status,
+      currentPaymentProofId: row.current_payment_proof_id,
+      requestedAt: row.requested_at ?? row.created_at,
+      createdAt: row.created_at,
+      approvedAt: row.approved_at,
+      approvedBy: row.approved_by,
+      rejectedAt: row.rejected_at,
+      rejectionReason: row.rejection_reason,
+      createdSubscriptionId: row.created_subscription_id,
+      planNameSnapshot: row.plan_name_snapshot,
+      durationDaysSnapshot: row.duration_days_snapshot,
+      totalMealsSnapshot: row.total_meals_snapshot,
+      mealsPerDaySnapshot: row.meals_per_day_snapshot,
+      baseAmountSnapshot: row.base_amount_snapshot ? Number(row.base_amount_snapshot) : undefined,
+      convenienceFeePercentSnapshot: row.convenience_fee_percent_snapshot ? Number(row.convenience_fee_percent_snapshot) : undefined,
+      convenienceFeeSnapshot: row.convenience_fee_snapshot ? Number(row.convenience_fee_snapshot) : undefined,
+      currencySnapshot: row.currency_snapshot || 'INR',
+      categoryCreditCostsSnapshot: row.category_credit_costs_snapshot,
+      featuresSnapshot: row.features_snapshot,
+      customerName: userRelation?.name ?? 'Customer',
+      customerEmail: userRelation?.email ?? 'Email not provided',
+      customerPhone: userRelation?.phone ?? 'Phone not provided',
+    };
+  });
 };
 
 export const approveSubscriptionPurchase = async (requestId: string): Promise<string> => {

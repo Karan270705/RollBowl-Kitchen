@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/src/lib/supabase';
 import {
   fetchPaymentProofForOrder,
   fetchPaymentProofForSubscriptionRequest,
@@ -76,6 +78,40 @@ export const useRejectOrderPayment = () => {
 };
 
 export const useSubscriptionRequests = (stallId?: string) => {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channelName = `kitchen-sub-requests:${stallId || 'default'}`;
+    let channel = supabase.getChannels().find(c => c.topic === `realtime:${channelName}`);
+
+    if (!channel) {
+      channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'subscription_purchase_requests' },
+          () => {
+            void queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.subRequests() });
+            void queryClient.invalidateQueries({ queryKey: ['subscribers_list'] });
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'payment_proofs' },
+          () => {
+            void queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.subRequests() });
+          }
+        )
+        .subscribe();
+    }
+
+    return () => {
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [stallId, queryClient]);
+
   return useQuery({
     queryKey: PAYMENT_KEYS.subRequests(stallId),
     queryFn: () => fetchSubscriptionPurchaseRequests(stallId),

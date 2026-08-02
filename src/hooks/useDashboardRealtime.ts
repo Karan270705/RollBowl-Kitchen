@@ -156,6 +156,31 @@ export const useDashboardRealtime = (
 
           invalidateCanonicalOperationalQueries(queryClient, stallId, operationsDate);
         }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_movements',
+        },
+        (payload: any) => {
+          const record = payload.new && Object.keys(payload.new).length > 0
+            ? payload.new
+            : payload.old;
+
+          // Only invalidate for walk-in sales to avoid unnecessary refetches
+          if (record?.movement_type === 'walk_in_sale' || payload.eventType === 'INSERT') {
+            console.log('[DASHBOARD REALTIME] Inventory movement changed', {
+              eventType: payload.eventType,
+              table: 'inventory_movements',
+              movementType: record?.movement_type,
+              id: record?.id,
+            });
+
+            invalidateCanonicalOperationalQueries(queryClient, stallId, operationsDate);
+          }
+        }
       );
 
     // Subscribe AFTER registering handlers

@@ -18,6 +18,12 @@ export const ordersKeys = {
     ['orders', 'list', stallId, operationsDate || 'null'] as const,
 };
 
+export const walkInKeys = {
+  all: ['walk-in-sales'] as const,
+  list: (stallId: string, operationsDate: string | null) =>
+    ['walk-in-sales', 'list', stallId, operationsDate || 'null'] as const,
+};
+
 export const invalidateCanonicalOperationalQueries = (
   queryClient: QueryClient,
   stallId: string,
@@ -25,11 +31,13 @@ export const invalidateCanonicalOperationalQueries = (
 ) => {
   if (operationalDate) {
     queryClient.invalidateQueries({ queryKey: ordersKeys.list(stallId, operationalDate) });
+    queryClient.invalidateQueries({ queryKey: walkInKeys.list(stallId, operationalDate) });
     queryClient.invalidateQueries({ queryKey: dashboardKeys.summary(stallId, operationalDate) });
     queryClient.invalidateQueries({ queryKey: dashboardKeys.mostOrdered(stallId, operationalDate) });
     queryClient.invalidateQueries({ queryKey: dashboardKeys.paymentBreakdown(stallId, operationalDate) });
   } else {
     queryClient.invalidateQueries({ queryKey: ordersKeys.all });
+    queryClient.invalidateQueries({ queryKey: walkInKeys.all });
     queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
   }
 };

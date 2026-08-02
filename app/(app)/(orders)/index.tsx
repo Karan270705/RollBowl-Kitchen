@@ -3,19 +3,20 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { OrderCard } from '@/src/components/orders/OrderCard';
-import { useOrders } from '@/src/hooks/useOrders';
+import { WalkInCard } from '@/src/components/orders/WalkInCard';
+import { useOrderHistory } from '@/src/hooks/useOrders';
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
-import { Order } from '@/src/types/models';
+import { HistoryEntry } from '@/src/types/models';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
 type SectionFilter = 'active' | 'completed';
-type TypeFilter = 'all' | 'direct' | 'subscription';
+type TypeFilter = 'all' | 'direct' | 'subscription' | 'walk_in';
 
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
   const { stallId, resolvedOperationalDate } = useOperationalContext();
-  const { data: orders = [], isLoading, refetch, isRefetching } = useOrders(stallId, resolvedOperationalDate);
+  const { data: history, isLoading, refetch, isRefetching } = useOrderHistory(stallId, resolvedOperationalDate);
 
   useFocusEffect(
     useCallback(() => {
@@ -26,33 +27,46 @@ export default function OrdersScreen() {
   const [sectionFilter, setSectionFilter] = useState<SectionFilter>('active');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
 
-  // Group orders by pickup_date
-  const groupedOrders = useMemo(() => {
+  // Group entries by date
+  const groupedEntries = useMemo(() => {
     // 1. Filter by section (Active vs Completed)
-    let filtered = orders.filter(o => 
-      sectionFilter === 'active' 
-        ? ['pending', 'confirmed', 'preparing', 'ready'].includes(o.status)
-        : ['picked_up', 'delivered'].includes(o.status)
-    );
+    let filtered = history.filter(entry => {
+      if (entry.type === 'walk_in') {
+        // Walk-in sales are always completed
+        return sectionFilter === 'completed';
+      }
+      // Order entries
+      const order = entry.data;
+      return sectionFilter === 'active'
+        ? ['pending', 'confirmed', 'preparing', 'ready'].includes(order.status)
+        : ['picked_up', 'delivered'].includes(order.status);
+    });
 
     // 2. Filter by order type
     if (typeFilter === 'direct') {
-      filtered = filtered.filter(o => o.orderType !== 'subscription');
+      filtered = filtered.filter(e => e.type === 'order' && e.data.orderType !== 'subscription');
     } else if (typeFilter === 'subscription') {
-      filtered = filtered.filter(o => o.orderType === 'subscription');
+      filtered = filtered.filter(e => e.type === 'order' && e.data.orderType === 'subscription');
+    } else if (typeFilter === 'walk_in') {
+      filtered = filtered.filter(e => e.type === 'walk_in');
     }
 
-    // 3. Group by pickup_date
-    const groups = filtered.reduce((acc, order) => {
-      const date = order.pickupDate || 'No Date';
+    // 3. Group by date
+    const groups = filtered.reduce((acc, entry) => {
+      let date: string;
+      if (entry.type === 'order') {
+        date = entry.data.pickupDate || 'No Date';
+      } else {
+        date = entry.data.inventoryDate || 'No Date';
+      }
       if (!acc[date]) acc[date] = [];
-      acc[date].push(order);
+      acc[date].push(entry);
       return acc;
-    }, {} as Record<string, Order[]>);
+    }, {} as Record<string, HistoryEntry[]>);
 
     // Sort dates ascending
     return Object.entries(groups).sort(([dateA], [dateB]) => dateA.localeCompare(dateB));
-  }, [orders, sectionFilter, typeFilter]);
+  }, [history, sectionFilter, typeFilter]);
 
   const FilterTab = ({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) => (
     <Text 
@@ -102,6 +116,15 @@ export default function OrdersScreen() {
           >
             Subscription
           </Text>
+          <Text 
+            onPress={() => setTypeFilter('walk_in')}
+            style={[
+              styles.typeBadge, 
+              typeFilter === 'walk_in' && styles.typeBadgeWalkInActive,
+            ]}
+          >
+            Walk-in
+          </Text>
         </View>
       </View>
 
@@ -115,16 +138,16 @@ export default function OrdersScreen() {
           contentContainerStyle={styles.listContent}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.primary} />}
         >
-          {groupedOrders.length === 0 ? (
+          {groupedEntries.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="receipt-outline" size={48} color={Colors.textTertiary} />
               <Text style={styles.emptyTitle}>No Orders Found</Text>
               <Text style={styles.emptyDesc}>
-                There are no {sectionFilter} {typeFilter === 'all' ? '' : typeFilter} orders in the queue.
+                There are no {sectionFilter} {typeFilter === 'all' ? '' : typeFilter === 'walk_in' ? 'walk-in' : typeFilter} orders in the queue.
               </Text>
             </View>
           ) : (
-            groupedOrders.map(([date, dateOrders]) => {
+            groupedEntries.map(([date, dateEntries]) => {
               const formattedDate = new Date(date).toLocaleDateString('en-US', {
                 weekday: 'long', month: 'short', day: 'numeric'
               });
@@ -134,12 +157,15 @@ export default function OrdersScreen() {
                   <View style={styles.dateHeader}>
                     <Ionicons name="calendar" size={16} color={Colors.primary} />
                     <Text style={styles.dateHeaderText}>{date === 'No Date' ? date : formattedDate}</Text>
-                    <Text style={styles.dateCount}>{dateOrders.length}</Text>
+                    <Text style={styles.dateCount}>{dateEntries.length}</Text>
                   </View>
                   
-                  {dateOrders.map(order => (
-                    <OrderCard key={order.id} order={order} />
-                  ))}
+                  {dateEntries.map(entry => {
+                    if (entry.type === 'walk_in') {
+                      return <WalkInCard key={`wi-${entry.data.id}`} walkIn={entry.data} />;
+                    }
+                    return <OrderCard key={`ord-${entry.data.id}`} order={entry.data} />;
+                  })}
                 </View>
               );
             })
@@ -208,6 +234,11 @@ const styles = StyleSheet.create({
     color: Colors.background,
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
+  },
+  typeBadgeWalkInActive: {
+    color: Colors.textInverse,
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
   },
   list: {
     flex: 1,

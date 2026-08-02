@@ -116,3 +116,28 @@ export interface Order {
   updatedAt: string;
 }
 
+// ─── Walk-in Sales ───────────────────────────────────────────
+
+export interface WalkInSale {
+  id: string;                    // inventory_movements.id
+  batchItemId: string;           // inventory_batch_item_id
+  batchId: string;               // inventory_batch_id
+  mealId: string;
+  mealName: string;
+  quantity: number;
+  unitPrice: number;             // stored at time of sale
+  totalAmount: number;           // quantity × unitPrice
+  movementType: 'walk_in_sale';
+  paymentMethod: 'cash' | 'upi';
+  operatorName: string;          // joined from users.name via created_by
+  stallId: string;
+  note?: string;
+  inventoryDate: string;         // from inventory_batches.inventory_date
+  createdAt: string;
+}
+
+// ─── Unified History Entry ───────────────────────────────────
+
+export type HistoryEntry =
+  | { type: 'order'; data: Order }
+  | { type: 'walk_in'; data: WalkInSale };

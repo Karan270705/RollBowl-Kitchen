@@ -1,15 +1,17 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing } from '@/src/constants/theme';
+import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 
 interface EmptyStateProps {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle?: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle }) => {
+export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle, actionLabel, onAction }) => {
   return (
     <View style={styles.container}>
       <View style={styles.iconWrap}>
@@ -17,6 +19,11 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, subtitle })
       </View>
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      {actionLabel && onAction && (
+        <TouchableOpacity style={styles.actionButton} onPress={onAction}>
+          <Text style={styles.actionButtonText}>{actionLabel}</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -51,5 +58,17 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     textAlign: 'center',
     lineHeight: Typography.lineHeight.base,
+  },
+  actionButton: {
+    marginTop: Spacing.lg,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.primary,
+    borderRadius: Radii.md,
+  },
+  actionButtonText: {
+    fontFamily: Typography.family.semiBold,
+    fontSize: Typography.size.sm,
+    color: Colors.white,
   },
 });

@@ -34,6 +34,32 @@ export function parseTimeToDateIST(dateStr: string, timeStr: string): Date {
   return new Date(utcMs);
 }
 
+// Helper to get yesterday's date string in IST without toLocaleString
+export function getYesterdayISTDateString(baseDateStr: string): string {
+  const [year, month, day] = baseDateStr.split('-').map(Number);
+  const d = new Date(Date.UTC(year, month - 1, day - 1));
+  return d.toISOString().split('T')[0];
+}
+
+/**
+ * Authoritative Single Source of Truth for Menu Schedule Timestamps.
+ * Derives `visibleFrom` from OPERATIONAL_ROLLOVER_TIME on the previous calendar day,
+ * and `orderCutoff` from ORDER_CUTOFF_TIME on the target menu date.
+ */
+export function generateMenuScheduleTimestamps(menuDateStr: string): { visibleFrom: string; orderCutoff: string } {
+  const previousDayStr = getYesterdayISTDateString(menuDateStr);
+  const rolloverTimeStr = AppConfig.BUSINESS.OPERATIONAL_ROLLOVER_TIME || '15:00';
+  const cutoffTimeStr = AppConfig.BUSINESS.ORDER_CUTOFF_TIME || '10:00';
+
+  const visibleFromDate = parseTimeToDateIST(previousDayStr, rolloverTimeStr);
+  const orderCutoffDate = parseTimeToDateIST(menuDateStr, cutoffTimeStr);
+
+  return {
+    visibleFrom: visibleFromDate.toISOString(),
+    orderCutoff: orderCutoffDate.toISOString(),
+  };
+}
+
 export interface OperationalContextResult {
   calendarDate: string;
   resolvedOperationalDate: string | null;

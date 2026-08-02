@@ -2,6 +2,7 @@ import { supabase } from '@/src/lib/supabase';
 import { MenuSchedule, MenuScheduleItem, Meal } from '@/src/types/models';
 import { AppConfig } from '@/src/constants/config';
 import { getKitchenDate, getKitchenTomorrow } from '@/src/utils/helpers';
+import { generateMenuScheduleTimestamps } from '@/src/utils/operationalDate';
 
 // Helper to get the primary stall for the single-stall operation
 export const getPrimaryStallId = async (): Promise<string> => {
@@ -92,25 +93,16 @@ export const getMenuForDate = async (date: string, stallId?: string): Promise<{ 
 export const createMenuSchedule = async (date: string, stallId?: string): Promise<MenuSchedule> => {
   const actualStallId = stallId || await getPrimaryStallId();
   
-  // Default rules (6 PM publish previous day, 10 AM cutoff day of)
-  const menuDateObj = new Date(date);
-  
-  // visible_from: Day before at 18:00
-  const visibleFrom = new Date(menuDateObj);
-  visibleFrom.setDate(visibleFrom.getDate() - 1);
-  visibleFrom.setHours(18, 0, 0, 0);
-
-  // order_cutoff: Target day at 10:00
-  const orderCutoff = new Date(menuDateObj);
-  orderCutoff.setHours(10, 0, 0, 0);
+  // Single Source of Truth: derive visible_from and order_cutoff using generateMenuScheduleTimestamps
+  const { visibleFrom, orderCutoff } = generateMenuScheduleTimestamps(date);
 
   const { data, error } = await supabase
     .from('menu_schedules')
     .insert({
       stall_id: actualStallId,
       menu_date: date,
-      visible_from: visibleFrom.toISOString(),
-      order_cutoff: orderCutoff.toISOString(),
+      visible_from: visibleFrom,
+      order_cutoff: orderCutoff,
       is_published: true,
     })
     .select()

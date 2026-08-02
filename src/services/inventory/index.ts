@@ -393,7 +393,9 @@ export const recordInventoryMovement = async (
   movementType: string,
   quantity: number,
   note?: string,
-  referenceOrderId?: string
+  referenceOrderId?: string,
+  paymentMethod?: 'cash' | 'upi',
+  unitPrice?: number
 ): Promise<LiveInventoryStatus> => {
   const { data, error } = await supabase.rpc('record_inventory_movement', {
     p_batch_item_id: batchItemId,
@@ -403,5 +405,105 @@ export const recordInventoryMovement = async (
     p_reference_order_id: referenceOrderId || null
   });
   if (error) throw parseInventoryError(error);
+
+  // For walk-in sales, update the new columns on the movement row
+  if (movementType === 'walk_in_sale' && (paymentMethod || unitPrice != null)) {
+    // Find the most recent movement for this batch item of this type
+    const { data: movements, error: mvErr } = await supabase
+      .from('inventory_movements')
+      .select('id')
+      .eq('inventory_batch_item_id', batchItemId)
+      .eq('movement_type', 'walk_in_sale')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (!mvErr && movements && movements.length > 0) {
+      const updateFields: Record<string, any> = {};
+      if (paymentMethod) updateFields.payment_method = paymentMethod;
+      if (unitPrice != null) updateFields.unit_price = unitPrice;
+
+      await supabase
+        .from('inventory_movements')
+        .update(updateFields)
+        .eq('id', movements[0].id);
+    }
+  }
+
   return data as LiveInventoryStatus;
+};
+
+// ─── Walk-in Sales History ───────────────────────────────────
+
+import { WalkInSale } from '@/src/types/models';
+
+export const fetchWalkInSales = async (
+  stallId: string,
+  date: string
+): Promise<WalkInSale[]> => {
+  // Query inventory_movements with walk_in_sale type, joined with related data
+  const { data, error } = await supabase
+    .from('inventory_movements')
+    .select(`
+      id,
+      inventory_batch_item_id,
+      inventory_batch_id,
+      meal_id,
+      movement_type,
+      quantity,
+      unit_price,
+      payment_method,
+      note,
+      created_by,
+      created_at,
+      inventory_batch_items!inner (
+        meal_id,
+        meals!inner (
+          name,
+          price
+        )
+      ),
+      inventory_batches!inner (
+        stall_id,
+        inventory_date
+      ),
+      users:created_by (
+        name
+      )
+    `)
+    .eq('movement_type', 'walk_in_sale')
+    .eq('inventory_batches.stall_id', stallId)
+    .eq('inventory_batches.inventory_date', date)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[fetchWalkInSales] Error:', error);
+    throw parseInventoryError(error);
+  }
+
+  if (!data || data.length === 0) return [];
+
+  return data.map((row: any): WalkInSale => {
+    const meal = row.inventory_batch_items?.meals;
+    const batchInfo = row.inventory_batches;
+    const user = row.users;
+    const storedPrice = row.unit_price != null ? Number(row.unit_price) : (meal?.price ? Number(meal.price) : 0);
+
+    return {
+      id: row.id,
+      batchItemId: row.inventory_batch_item_id,
+      batchId: row.inventory_batch_id,
+      mealId: row.meal_id,
+      mealName: meal?.name || 'Unknown Meal',
+      quantity: row.quantity,
+      unitPrice: storedPrice,
+      totalAmount: row.quantity * storedPrice,
+      movementType: 'walk_in_sale',
+      paymentMethod: (row.payment_method as 'cash' | 'upi') || 'cash',
+      operatorName: user?.name || 'Unknown',
+      stallId: batchInfo?.stall_id || stallId,
+      note: row.note || undefined,
+      inventoryDate: batchInfo?.inventory_date || date,
+      createdAt: row.created_at,
+    };
+  });
 };

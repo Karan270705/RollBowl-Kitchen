@@ -379,8 +379,8 @@ export const useCancelBatch = () => {
 export const useRecordMovement = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { batchItemId: string, type: string, quantity: number, note?: string, batchId: string }) => 
-      recordInventoryMovement(vars.batchItemId, vars.type, vars.quantity, vars.note),
+    mutationFn: (vars: { batchItemId: string, type: string, quantity: number, note?: string, batchId: string, paymentMethod?: 'cash' | 'upi', unitPrice?: number }) => 
+      recordInventoryMovement(vars.batchItemId, vars.type, vars.quantity, vars.note, undefined, vars.paymentMethod, vars.unitPrice),
     onSuccess: (updatedItem, vars) => {
       if (updatedItem) {
         queryClient.setQueryData<LiveInventoryStatus[]>(
@@ -399,6 +399,10 @@ export const useRecordMovement = () => {
       queryClient.invalidateQueries({ queryKey: ['inventory-batch', vars.batchId] });
       queryClient.invalidateQueries({ queryKey: ['inventory-batch-items', vars.batchId] });
       queryClient.invalidateQueries({ queryKey: ['inventory-batches'] });
+      // Also invalidate walk-in sales queries so order history updates
+      if (vars.type === 'walk_in_sale') {
+        queryClient.invalidateQueries({ queryKey: ['walk-in-sales'] });
+      }
     }
   });
 };

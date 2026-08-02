@@ -117,6 +117,7 @@ export const MovementModal = ({ visible, onClose, batchId, item, mode }: any) =>
   const [type, setType] = useState('walk_in_sale');
   const [qtyStr, setQtyStr] = useState('1');
   const [note, setNote] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'upi'>('cash');
 
   // Keep type synchronized when mode changes
   useEffect(() => {
@@ -124,6 +125,7 @@ export const MovementModal = ({ visible, onClose, batchId, item, mode }: any) =>
       setType(mode === 'add' ? 'stock_added' : 'walk_in_sale');
       setQtyStr('1');
       setNote('');
+      setPaymentMethod('cash');
     }
   }, [visible, mode]);
 
@@ -131,6 +133,7 @@ export const MovementModal = ({ visible, onClose, batchId, item, mode }: any) =>
 
   // Protect reserved app orders for all normal manual outflows
   const maxAllowed = mode === 'remove' ? item.extra_available : null;
+  const isWalkInSale = type === 'walk_in_sale';
 
   const handleRecord = async () => {
     const qty = parseInt(qtyStr, 10);
@@ -144,7 +147,18 @@ export const MovementModal = ({ visible, onClose, batchId, item, mode }: any) =>
     }
 
     try {
-      await recordMovement({ batchItemId: item.inventory_batch_item_id, type, quantity: qty, note, batchId });
+      await recordMovement({
+        batchItemId: item.inventory_batch_item_id,
+        type,
+        quantity: qty,
+        note,
+        batchId,
+        // Walk-in sale specific fields
+        ...(isWalkInSale ? {
+          paymentMethod,
+          unitPrice: item.unit_price || 0,
+        } : {}),
+      });
       Alert.alert('Success', 'Movement recorded.');
       onClose();
     } catch (e: any) {
@@ -184,6 +198,27 @@ export const MovementModal = ({ visible, onClose, batchId, item, mode }: any) =>
                />
              )}
           </View>
+
+          {/* Payment Method selector — only for walk-in sales */}
+          {isWalkInSale && (
+            <View style={styles.paymentSection}>
+              <Text style={styles.paymentLabel}>Payment Method</Text>
+              <View style={styles.paymentRow}>
+                <Button
+                  title="💵 Cash"
+                  variant={paymentMethod === 'cash' ? 'primary' : 'outline'}
+                  onPress={() => setPaymentMethod('cash')}
+                  style={styles.paymentBtn}
+                />
+                <Button
+                  title="📱 UPI"
+                  variant={paymentMethod === 'upi' ? 'primary' : 'outline'}
+                  onPress={() => setPaymentMethod('upi')}
+                  style={styles.paymentBtn}
+                />
+              </View>
+            </View>
+          )}
 
           <Input 
             label="Quantity"
@@ -229,5 +264,9 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xl },
   flexBtn: { flex: 1 },
   typeSelector: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginBottom: Spacing.lg },
-  hintText: { fontFamily: Typography.family.regular, fontSize: Typography.size.sm, color: Colors.textTertiary, marginBottom: Spacing.sm }
+  hintText: { fontFamily: Typography.family.regular, fontSize: Typography.size.sm, color: Colors.textTertiary, marginBottom: Spacing.sm },
+  paymentSection: { marginBottom: Spacing.lg },
+  paymentLabel: { fontFamily: Typography.family.medium, fontSize: Typography.size.sm, color: Colors.textSecondary, marginBottom: Spacing.xs },
+  paymentRow: { flexDirection: 'row', gap: Spacing.sm },
+  paymentBtn: { flex: 1 },
 });

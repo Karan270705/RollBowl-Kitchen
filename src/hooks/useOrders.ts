@@ -1,7 +1,9 @@
+import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchOrders, updateOrderStatus, updateOrderPaymentStatus } from '../services/orders';
-import { Order } from '../types/models';
-import { dashboardKeys, ordersKeys, invalidateCanonicalOperationalQueries } from '../constants/queryKeys';
+import { fetchWalkInSales } from '../services/inventory';
+import { Order, HistoryEntry } from '../types/models';
+import { dashboardKeys, ordersKeys, walkInKeys, invalidateCanonicalOperationalQueries } from '../constants/queryKeys';
 import { normalizeError } from '../utils/errors';
 import { Alert } from 'react-native';
 
@@ -11,6 +13,64 @@ export const useOrders = (stallId: string | undefined, operationsDate: string | 
     queryFn: () => fetchOrders({ stallId, date: operationsDate || undefined, includeCancelled: false }),
     enabled: !!stallId && !!operationsDate,
   });
+};
+
+export const useWalkInSales = (stallId: string | undefined, operationsDate: string | undefined | null) => {
+  return useQuery({
+    queryKey: stallId && operationsDate ? walkInKeys.list(stallId, operationsDate) : ['walk-in-sales', 'skip'],
+    queryFn: () => fetchWalkInSales(stallId!, operationsDate!),
+    enabled: !!stallId && !!operationsDate,
+  });
+};
+
+export const useOrderHistory = (stallId: string | undefined, operationsDate: string | undefined | null) => {
+  const ordersQuery = useOrders(stallId, operationsDate);
+  const walkInQuery = useWalkInSales(stallId, operationsDate);
+
+  // Screen stops loading once primary orders have loaded or failed. Supplemental walk-ins do not block forever.
+  const isLoading = ordersQuery.isLoading;
+  const isRefetching = ordersQuery.isRefetching || walkInQuery.isRefetching;
+  const isError = ordersQuery.isError || walkInQuery.isError;
+
+  const refetch = useCallback(async () => {
+    await Promise.all([ordersQuery.refetch(), walkInQuery.refetch()]);
+  }, [ordersQuery.refetch, walkInQuery.refetch]);
+
+  // Merge into unified HistoryEntry[] sorted by createdAt descending (newest first)
+  const history: HistoryEntry[] = useMemo(() => {
+    const list: HistoryEntry[] = [];
+
+    if (ordersQuery.data) {
+      for (const order of ordersQuery.data) {
+        list.push({ type: 'order', data: order });
+      }
+    }
+
+    if (walkInQuery.data) {
+      for (const walkIn of walkInQuery.data) {
+        list.push({ type: 'walk_in', data: walkIn });
+      }
+    }
+
+    // Sort newest first
+    list.sort((a, b) => {
+      const aTime = new Date(a.data.createdAt).getTime();
+      const bTime = new Date(b.data.createdAt).getTime();
+      return bTime - aTime;
+    });
+
+    return list;
+  }, [ordersQuery.data, walkInQuery.data]);
+
+  return {
+    data: history,
+    orders: ordersQuery.data || [],
+    walkIns: walkInQuery.data || [],
+    isLoading,
+    isRefetching,
+    isError,
+    refetch,
+  };
 };
 
 export const useUpdateOrderStatus = (stallId: string | undefined, operationsDate: string | undefined | null) => {

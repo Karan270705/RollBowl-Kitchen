@@ -68,7 +68,7 @@ export default function InventoryBatchDetailScreen() {
   useEffect(() => {
     getPrimaryStallId().then(sid => {
       setStallId(sid);
-      if (batch?.status === 'draft') {
+      if (batch?.status === 'draft' || batch?.status === 'active') {
         fetchMeals(sid);
       }
     });
@@ -416,7 +416,9 @@ export default function InventoryBatchDetailScreen() {
                           title="Remove Stock" 
                           variant="outline" 
                           onPress={() => {
-                            setSelectedMovementItem(ls);
+                            // Augment with meal price for walk-in sale recording
+                            const mealPrice = availableMeals.find(m => m.id === ls.meal_id)?.price || 0;
+                            setSelectedMovementItem({ ...ls, unit_price: Number(mealPrice) });
                             setMovementMode('remove');
                             setShowMovement(true);
                           }} 
