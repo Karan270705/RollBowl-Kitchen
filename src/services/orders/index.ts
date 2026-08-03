@@ -67,13 +67,13 @@ export const fetchOrders = async (options: FetchOrdersOptions): Promise<Order[]>
 
   if (options.includeFuture) {
     // For orders page: we want today AND future
-  } else if (options.date) {
+  } else if (options.date && options.date !== 'all' && options.date !== 'null' && /^\d{4}-\d{2}-\d{2}$/.test(options.date)) {
     query = query.eq('pickup_date', options.date);
   }
 
   const { data: ordersData, error: ordersError } = await query
-    .order('pickup_date', { ascending: true })
-    .order('created_at', { ascending: true });
+    .order('pickup_date', { ascending: false })
+    .order('created_at', { ascending: false });
 
   if (ordersError) throw ordersError;
 
@@ -99,37 +99,105 @@ export const fetchOrders = async (options: FetchOrdersOptions): Promise<Order[]>
       unitPrice: Number(item.unit_price),
       totalPrice: Number(item.total_price),
       specialInstructions: item.special_instructions ?? undefined,
+      subscriptionId: item.subscription_id ?? undefined,
+      creditsUsed:
+        item.credits_used != null
+          ? Number(item.credits_used)
+          : item.subscription_id || Number(item.unit_price) === 0
+          ? Number(item.quantity)
+          : 0,
       createdAt: item.created_at,
     });
     return acc;
   }, {});
 
-  const orders = ordersData.map((row: any): Order => ({
-    id: row.id,
-    orderNumber: row.order_number,
-    userId: row.user_id,
-    customerName: row.customer_name,
-    customerPhone: row.users?.phone,
-    stallId: row.stall_id,
-    stallName: row.stall_name,
-    status: row.status,
-    orderType: row.order_type,
-    paymentStatus: row.payment_status,
-    paymentMethod: row.payment_method,
-    paymentVerificationStatus: row.payment_verification_status ?? undefined,
-    paymentProofDeadline: row.payment_proof_deadline ?? undefined,
-    subtotal: Number(row.subtotal),
-    tax: Number(row.tax),
-    discount: Number(row.discount),
-    total: Number(row.total),
-    notes: row.notes ?? undefined,
-    expectedPickupSlot: row.expected_pickup_slot ?? undefined,
-    pickupDate: row.pickup_date,
-    estimatedReadyTime: row.estimated_ready_time ?? undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    items: itemsByOrderId[row.id] || [],
-  }));
+  const subIds = [
+    ...new Set(
+      (itemsData || []).map((item: any) => item.subscription_id).filter(Boolean)
+    ),
+  ];
+  const userIdsForSubs = ordersData
+    .filter((o: any) => o.order_type === 'subscription')
+    .map((o: any) => o.user_id)
+    .filter(Boolean);
+
+  const planNamesBySubId: Record<string, string> = {};
+  const planNamesByUserId: Record<string, string> = {};
+
+  if (subIds.length > 0) {
+    const { data: subsData } = await supabase
+      .from('subscriptions')
+      .select('id, plan_name')
+      .in('id', subIds);
+    if (subsData) {
+      subsData.forEach((s: any) => {
+        if (s.plan_name) planNamesBySubId[s.id] = s.plan_name;
+      });
+    }
+  }
+
+  if (userIdsForSubs.length > 0) {
+    const { data: userSubs } = await supabase
+      .from('subscriptions')
+      .select('user_id, plan_name')
+      .in('user_id', userIdsForSubs)
+      .order('created_at', { ascending: false });
+    if (userSubs) {
+      userSubs.forEach((s: any) => {
+        if (s.plan_name && !planNamesByUserId[s.user_id]) {
+          planNamesByUserId[s.user_id] = s.plan_name;
+        }
+      });
+    }
+  }
+
+  const orders = ordersData.map((row: any): Order => {
+    const orderItems: OrderItem[] = itemsByOrderId[row.id] || [];
+    const firstSubItem = orderItems.find((i) => i.subscriptionId);
+    const hasSubItem =
+      row.order_type === 'subscription' ||
+      orderItems.some((i) => i.subscriptionId || i.unitPrice === 0);
+    const planName =
+      (firstSubItem && planNamesBySubId[firstSubItem.subscriptionId!]) ||
+      planNamesByUserId[row.user_id] ||
+      (hasSubItem ? 'Solo Plan' : undefined);
+
+    const totalCreditsUsed = orderItems.reduce((sum, item) => {
+      const isSubItem =
+        Boolean(item.subscriptionId) ||
+        (row.order_type === 'subscription' && item.unitPrice === 0);
+      return sum + (isSubItem ? item.creditsUsed || item.quantity : 0);
+    }, 0);
+
+    return {
+      id: row.id,
+      orderNumber: row.order_number,
+      userId: row.user_id,
+      customerName: row.customer_name,
+      customerPhone: row.users?.phone,
+      stallId: row.stall_id,
+      stallName: row.stall_name,
+      status: row.status,
+      orderType: row.order_type,
+      paymentStatus: row.payment_status,
+      paymentMethod: row.payment_method,
+      paymentVerificationStatus: row.payment_verification_status ?? undefined,
+      paymentProofDeadline: row.payment_proof_deadline ?? undefined,
+      subtotal: Number(row.subtotal),
+      tax: Number(row.tax),
+      discount: Number(row.discount),
+      total: Number(row.total),
+      subscriptionPlanName: planName,
+      creditsUsed: totalCreditsUsed,
+      notes: row.notes ?? undefined,
+      expectedPickupSlot: row.expected_pickup_slot ?? undefined,
+      pickupDate: row.pickup_date,
+      estimatedReadyTime: row.estimated_ready_time ?? undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      items: orderItems,
+    };
+  });
 
   logAuthoritativeState(orders, actualStallId, options.date);
   return orders;

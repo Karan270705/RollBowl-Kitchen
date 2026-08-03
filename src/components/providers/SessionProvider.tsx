@@ -32,6 +32,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setSession(null, null);
         setInitializing(false);
       }
+    }).catch((error) => {
+      console.error('[Kitchen] Error getting session:', error);
+      setSession(null, null);
+      setInitializing(false);
     });
 
     // Listen for auth changes

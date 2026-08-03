@@ -31,8 +31,12 @@ export const useExportOrders = () => {
       // Fetch
       const dataset = await fetchOrdersForExport(stallId, fromDate, toDate, setProgress);
       
-      if (dataset.orders.length === 0) {
-        throw new Error(`No orders found between ${fromDate} and ${toDate}`);
+      if (
+        dataset.orders.length === 0 &&
+        dataset.walkInMovements.length === 0 &&
+        dataset.subscriptions.length === 0
+      ) {
+        throw new Error(`No exportable data found between ${fromDate} and ${toDate}`);
       }
 
       const filenameDate = `${fromDate}_to_${toDate}`;

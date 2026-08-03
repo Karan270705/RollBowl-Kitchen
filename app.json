@@ -5,7 +5,7 @@
     "owner": "karang2707s-team",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/kitchen-icon.png",
     "scheme": "rollbowl-kitchen",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -17,22 +17,22 @@
       "package": "com.rollbowl.kitchen",
       "adaptiveIcon": {
         "backgroundColor": "#0F1117",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
+        "foregroundImage": "./assets/images/kitchen-adaptive-foreground.png",
+        "backgroundImage": "./assets/images/kitchen-adaptive-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/kitchen-favicon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/kitchen-splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#0F1117"

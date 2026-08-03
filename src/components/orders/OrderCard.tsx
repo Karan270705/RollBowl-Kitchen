@@ -1,38 +1,83 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { Order, OrderItem } from '@/src/types/models';
-import { useUpdateOrderStatus, useUpdateOrderPaymentStatus } from '@/src/hooks/useOrders';
+import {
+  useUpdateOrderStatus,
+  useUpdateOrderPaymentStatus,
+} from '@/src/hooks/useOrders';
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { PaymentProofViewerModal } from '../payments/PaymentProofViewerModal';
+import {
+  OrderStatusBadge,
+  OrderSummaryGrid,
+  SubscriptionSection,
+  CustomerPaysSection,
+  PaymentStateBlock,
+  OrderItemRow,
+  OrderActionGroup,
+} from './OrderPrimitives';
+import {
+  getStatusVisual,
+  getPaymentStateVisual,
+} from '@/src/constants/status';
 
 interface OrderCardProps {
   order: Order;
 }
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
-  const { stallId, resolvedOperationalDate } = useOperationalContext(order.stallId);
-  const { mutate: updateStatus, isPending } = useUpdateOrderStatus(stallId, order.pickupDate || resolvedOperationalDate);
-  const { mutate: updatePaymentStatus, isPending: isPaymentPending } = useUpdateOrderPaymentStatus(stallId, order.pickupDate || resolvedOperationalDate);
+  const { stallId, resolvedOperationalDate } = useOperationalContext(
+    order.stallId
+  );
+  const { mutate: updateStatus, isPending } = useUpdateOrderStatus(
+    stallId,
+    order.pickupDate || resolvedOperationalDate
+  );
+  const { mutate: updatePaymentStatus, isPending: isPaymentPending } =
+    useUpdateOrderPaymentStatus(
+      stallId,
+      order.pickupDate || resolvedOperationalDate
+    );
   const [isProofModalVisible, setIsProofModalVisible] = useState(false);
 
   const isUpiOrder = order.paymentMethod === 'upi';
-  const isPendingVerification = order.paymentVerificationStatus === 'pending';
-  const hasProofSubmitted = order.paymentVerificationStatus === 'pending' || 
-                             order.paymentVerificationStatus === 'verified' || 
-                             order.paymentVerificationStatus === 'rejected';
+  const isPendingVerification =
+    order.paymentVerificationStatus === 'pending';
 
-  // Status flow: pending → confirmed (Accepted) → ready → picked_up
+  // Only show proof button when proof is actually submitted or verified, never when rejected
+  const hasProofSubmitted =
+    order.paymentVerificationStatus === 'pending' ||
+    order.paymentVerificationStatus === 'verified';
+
   const getNextAction = () => {
     switch (order.status) {
       case 'pending':
-        return { label: 'Accept Order', nextStatus: 'confirmed' as const, color: Colors.info };
+        return {
+          label: 'Accept Order',
+          nextStatus: 'confirmed' as const,
+          color: '#3B82F6', // semantic blue for confirmed/accepting
+        };
       case 'confirmed':
-      case 'preparing': // Fallback for any legacy orders
-        return { label: 'Mark Ready', nextStatus: 'ready' as const, color: Colors.warning };
+      case 'preparing':
+        return {
+          label: 'Mark Ready',
+          nextStatus: 'ready' as const,
+          color: '#F5A623', // semantic orange/amber
+        };
       case 'ready':
-        return { label: 'Mark Collected', nextStatus: 'picked_up' as const, color: Colors.success };
+        return {
+          label: 'Mark Collected',
+          nextStatus: 'picked_up' as const,
+          color: '#10B981', // semantic green
+        };
       default:
         return null;
     }
@@ -42,12 +87,14 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
 
   const isAcceptAction = action && action.nextStatus === 'confirmed';
   const isCollectAction = action && action.nextStatus === 'picked_up';
-  
-  const isUpiUnverified = isUpiOrder && 
-    order.paymentVerificationStatus !== 'verified' && 
+
+  const isUpiUnverified =
+    isUpiOrder &&
+    order.paymentVerificationStatus !== 'verified' &&
     order.paymentVerificationStatus !== 'not_required';
-    
-  const isCashUnpaid = order.paymentMethod === 'cash' && order.paymentStatus !== 'paid';
+
+  const isCashUnpaid =
+    order.paymentMethod === 'cash' && order.paymentStatus !== 'paid';
 
   const showAcceptButton = action && !(isAcceptAction && isUpiUnverified);
 
@@ -57,179 +104,245 @@ export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending': return Colors.textTertiary;
-      case 'confirmed':
-      case 'preparing': return Colors.info;
-      case 'ready': return Colors.warning;
-      case 'picked_up':
-      case 'delivered': return Colors.success;
-      case 'cancelled': return Colors.error;
-      default: return Colors.textSecondary;
-    }
-  };
+  // Resolve visual properties
+  const orderTypeVisual = getStatusVisual(
+    order.orderType === 'subscription' ? 'subscription' : 'pre_order'
+  );
+  const paymentVisual = getPaymentStateVisual(
+    order.orderType,
+    order.paymentMethod,
+    order.paymentStatus,
+    order.paymentVerificationStatus
+  );
+
+  const subscriptionItems = (order.items || []).filter(
+    (item) =>
+      Boolean(item.subscriptionId) ||
+      (order.orderType === 'subscription' && item.unitPrice === 0)
+  );
+  const paidItems = (order.items || []).filter(
+    (item) =>
+      !Boolean(item.subscriptionId) &&
+      !(order.orderType === 'subscription' && item.unitPrice === 0)
+  );
+  const isMixedOrder = subscriptionItems.length > 0 && paidItems.length > 0;
+  const isPureSubOrder =
+    subscriptionItems.length > 0 && paidItems.length === 0;
+  const paidItemsTotal = paidItems.reduce(
+    (acc, i) => acc + (i.totalPrice || 0),
+    0
+  );
 
   return (
     <View style={styles.card}>
+      {/* Section A: Header Row (Customer Name + Order Number left, Status badge right) */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <Text style={styles.customerName}>{order.customerName}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(order.status) + '20' }]}>
-            <Text style={[styles.statusText, { color: getStatusColor(order.status) }]}>
-              {order.status === 'confirmed' ? 'ACCEPTED' : order.status.replace('_', ' ').toUpperCase()}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.headerBottom}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.customerName} numberOfLines={1}>
+            {order.customerName}
+          </Text>
           <Text style={styles.orderNumber}>{order.orderNumber}</Text>
-          {order.orderType === 'subscription' && (
-            <View style={styles.subBadge}>
-              <Ionicons name="calendar-outline" size={12} color={Colors.primary} />
-              <Text style={styles.subText}>SUBSCRIPTION</Text>
-            </View>
-          )}
-          {order.expectedPickupSlot && (
-            <View style={styles.slotBadge}>
-              <Ionicons name="time-outline" size={12} color={Colors.textSecondary} />
-              <Text style={styles.slotText}>{order.expectedPickupSlot}</Text>
-            </View>
-          )}
-          {order.paymentMethod === 'cash' && order.paymentStatus !== 'paid' ? (
-            <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
-              <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>Cash • Unpaid</Text>
-            </View>
-          ) : order.paymentMethod === 'upi' ? (
-            order.paymentVerificationStatus === 'pending' ? (
-              <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
-                <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>UPI • Verification pending</Text>
-              </View>
-            ) : order.paymentVerificationStatus === 'verified' || order.paymentStatus === 'paid' ? (
-              <View style={[styles.slotBadge, { backgroundColor: Colors.success + '20', borderColor: Colors.success }]}>
-                <Text style={[styles.slotText, { color: Colors.success, fontFamily: Typography.family.bold }]}>UPI • Paid</Text>
-              </View>
-            ) : order.paymentVerificationStatus === 'rejected' ? (
-              <View style={[styles.slotBadge, { backgroundColor: Colors.error + '20', borderColor: Colors.error }]}>
-                <Text style={[styles.slotText, { color: Colors.error, fontFamily: Typography.family.bold }]}>UPI • Rejected</Text>
-              </View>
-            ) : order.paymentVerificationStatus === 'expired' ? (
-              <View style={[styles.slotBadge, { backgroundColor: Colors.error + '20', borderColor: Colors.error }]}>
-                <Text style={[styles.slotText, { color: Colors.error, fontFamily: Typography.family.bold }]}>UPI • Expired</Text>
-              </View>
-            ) : (
-              <View style={[styles.slotBadge, { backgroundColor: Colors.warning + '20', borderColor: Colors.warning }]}>
-                <Text style={[styles.slotText, { color: Colors.warning, fontFamily: Typography.family.bold }]}>UPI • Awaiting proof</Text>
-              </View>
-            )
-          ) : (order.paymentMethod === 'card' || order.paymentStatus === 'paid') ? (
-            <View style={[styles.slotBadge, { backgroundColor: Colors.success + '20', borderColor: Colors.success }]}>
-              <Text style={[styles.slotText, { color: Colors.success, fontFamily: Typography.family.bold }]}>Paid</Text>
-            </View>
-          ) : null}
         </View>
+        <OrderStatusBadge status={order.status} />
       </View>
 
-      <View style={styles.divider} />
+      {/* Section B: Order Summary Grid (Replaces OrderInfoGrid) */}
+      <OrderSummaryGrid
+        subscriptionPlanName={order.subscriptionPlanName}
+        creditsUsed={order.creditsUsed}
+        customerPays={
+          isPureSubOrder ? 0 : isMixedOrder ? paidItemsTotal : order.total
+        }
+        paymentMethodLabel={paymentVisual.label}
+        pickupSlot={order.expectedPickupSlot || 'Immediate'}
+      />
 
-      <View style={styles.itemsList}>
-        {order.items?.map((item: OrderItem) => (
-          <View key={item.id} style={styles.itemRow}>
-            <Text style={styles.itemQuantity}>{item.quantity}x</Text>
-            <View style={styles.itemDetails}>
-              <Text style={styles.itemName}>{item.mealName}</Text>
-              {item.specialInstructions && (
-                <Text style={styles.itemNotes}>Note: {item.specialInstructions}</Text>
-              )}
-            </View>
-          </View>
-        ))}
-      </View>
+      {/* Inline Rejection Warning Block if UPI Rejected */}
+      <PaymentStateBlock
+        paymentMethod={order.paymentMethod}
+        verificationStatus={order.paymentVerificationStatus}
+        rejectionReason={(order as any).rejectionReason}
+      />
 
-      {order.notes && (
-        <View style={styles.orderNotes}>
-          <Ionicons name="document-text-outline" size={14} color={Colors.textTertiary} />
-          <Text style={styles.orderNotesText}>{order.notes}</Text>
+      {/* Section C: Ordered Items - Distinct Sections for Mixed, Pure Sub, or Paid */}
+      {isMixedOrder ? (
+        <View style={styles.itemsList}>
+          <SubscriptionSection
+            items={subscriptionItems}
+            totalCreditsUsed={order.creditsUsed || 0}
+          />
+          <CustomerPaysSection
+            items={paidItems}
+            totalAmount={paidItemsTotal}
+            paymentMethodLabel={paymentVisual.label}
+            title="Customer Pays"
+          />
+        </View>
+      ) : isPureSubOrder ? (
+        <View style={styles.itemsList}>
+          <SubscriptionSection
+            items={subscriptionItems}
+            totalCreditsUsed={order.creditsUsed || 0}
+          />
+        </View>
+      ) : (
+        <View style={styles.itemsList}>
+          <CustomerPaysSection
+            items={paidItems.length > 0 ? paidItems : order.items || []}
+            totalAmount={order.total}
+            paymentMethodLabel={paymentVisual.label}
+            title="Order Items"
+          />
         </View>
       )}
 
-      {(action || (order.paymentMethod === 'cash' && order.paymentStatus === 'pending') || (isUpiOrder && hasProofSubmitted)) && (
-        <View style={styles.actionContainer}>
-          {order.paymentMethod === 'cash' && order.paymentStatus === 'pending' && (
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: Colors.success, marginBottom: action ? Spacing.sm : 0 }]}
-              onPress={() => updatePaymentStatus({ orderId: order.id, status: 'paid' })}
-              disabled={isPaymentPending}
-            >
-              {isPaymentPending ? (
-                <ActivityIndicator color={Colors.background} size="small" />
-              ) : (
-                <Text style={styles.actionText}>Mark as Paid</Text>
-              )}
-            </TouchableOpacity>
-          )}
+      {/* Optional Order Notes */}
+      {order.notes ? (
+        <View style={styles.orderNotes}>
+          <Ionicons
+            name="document-text-outline"
+            size={14}
+            color={Colors.textTertiary}
+          />
+          <Text style={styles.orderNotesText}>{order.notes}</Text>
+        </View>
+      ) : null}
 
+      {/* Section D: Contextual Action Section */}
+      {(showAcceptButton ||
+        (isCollectAction && isCashUnpaid) ||
+        (isUpiOrder && hasProofSubmitted) ||
+        (isAcceptAction && isUpiUnverified)) && (
+        <OrderActionGroup>
+          {/* 1. UPI Proof Submitted: View Payment Proof */}
           {isUpiOrder && hasProofSubmitted && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
-                styles.actionButton, 
-                { 
-                  backgroundColor: isPendingVerification ? Colors.primary : Colors.surfaceHighlight,
-                  borderWidth: isPendingVerification ? 0 : 1,
-                  borderColor: Colors.border,
-                  marginBottom: showAcceptButton ? Spacing.sm : 0 
-                }
+                styles.actionButton,
+                isPendingVerification
+                  ? styles.actionButtonPrimary
+                  : styles.actionButtonSecondary,
               ]}
               onPress={() => setIsProofModalVisible(true)}
+              activeOpacity={0.8}
             >
-              <Text style={[styles.actionText, { color: isPendingVerification ? Colors.white : Colors.textPrimary }]}>
-                {isPendingVerification ? 'Verify Payment Proof' : 'View Payment Receipt'}
+              <Ionicons
+                name="document-attach-outline"
+                size={18}
+                color={
+                  isPendingVerification
+                    ? Colors.white
+                    : Colors.textPrimary
+                }
+              />
+              <Text
+                style={[
+                  styles.actionText,
+                  {
+                    color: isPendingVerification
+                      ? Colors.white
+                      : Colors.textPrimary,
+                  },
+                ]}
+              >
+                {isPendingVerification
+                  ? 'View Payment Proof'
+                  : 'View Verified Proof'}
               </Text>
             </TouchableOpacity>
           )}
 
+          {/* 2. Cash unpaid when collecting: Mark as Paid */}
+          {isCollectAction && isCashUnpaid && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.actionButtonSuccess]}
+              onPress={() =>
+                updatePaymentStatus({ orderId: order.id, status: 'paid' })
+              }
+              disabled={isPaymentPending}
+              activeOpacity={0.8}
+            >
+              {isPaymentPending ? (
+                <ActivityIndicator color={Colors.white} size="small" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="cash-outline"
+                    size={18}
+                    color={Colors.white}
+                  />
+                  <Text style={styles.actionText}>Mark as Paid</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* 3. Accept / Mark Ready / Mark Collected */}
           {showAcceptButton && (
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[
-                styles.actionButton, 
-                { backgroundColor: (isCollectAction && isCashUnpaid) ? Colors.surfaceHighlight : (action?.color || Colors.primary) }
+                styles.actionButton,
+                {
+                  backgroundColor:
+                    isCollectAction && isCashUnpaid
+                      ? Colors.surfaceHighlight
+                      : action?.color || Colors.primary,
+                },
               ]}
               onPress={handleAction}
               disabled={isPending || !!(isCollectAction && isCashUnpaid)}
+              activeOpacity={0.8}
             >
               {isPending ? (
-                <ActivityIndicator color={Colors.background} size="small" />
+                <ActivityIndicator color={Colors.white} size="small" />
               ) : (
-                <Text style={[
-                  styles.actionText,
-                  (isCollectAction && isCashUnpaid) && { color: Colors.textSecondary }
-                ]}>
-                  {action.label}
-                </Text>
+                <>
+                  <Text
+                    style={[
+                      styles.actionText,
+                      isCollectAction &&
+                        isCashUnpaid && { color: Colors.textSecondary },
+                    ]}
+                  >
+                    {action.label}
+                  </Text>
+                </>
               )}
             </TouchableOpacity>
           )}
 
+          {/* Note when cash unpaid during collection */}
           {isCollectAction && isCashUnpaid && (
-            <View style={styles.disabledActionNote}>
-              <Ionicons name="warning-outline" size={14} color={Colors.warning} />
-              <Text style={[styles.disabledActionNoteText, { color: Colors.warning }]}>
-                Mark this cash order as paid before collecting it.
+            <View style={styles.noteRow}>
+              <Ionicons
+                name="warning-outline"
+                size={14}
+                color="#F59E0B"
+              />
+              <Text style={styles.noteText}>
+                Mark cash payment as paid before collecting order.
               </Text>
             </View>
           )}
 
+          {/* Note when UPI is unverified during acceptance */}
           {isAcceptAction && isUpiUnverified && (
-            <View style={styles.disabledActionNote}>
-              <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
-              <Text style={styles.disabledActionNoteText}>
-                {order.paymentVerificationStatus === 'pending' && 'Verify payment proof to accept order'}
-                {order.paymentVerificationStatus === 'rejected' && 'Payment proof rejected. Awaiting new submission.'}
-                {order.paymentVerificationStatus === 'awaiting_proof' && 'Awaiting payment proof from customer.'}
-                {order.paymentVerificationStatus === 'expired' && 'Payment proof expired.'}
+            <View style={styles.noteRow}>
+              <Ionicons
+                name="information-circle-outline"
+                size={14}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.noteTextSecondary}>
+                {order.paymentVerificationStatus === 'pending'
+                  ? 'Verify payment proof to accept order.'
+                  : order.paymentVerificationStatus === 'rejected'
+                  ? 'Payment proof rejected. Awaiting customer submission.'
+                  : 'Awaiting payment proof from customer.'}
               </Text>
             </View>
           )}
-        </View>
+        </OrderActionGroup>
       )}
 
       <PaymentProofViewerModal
@@ -246,147 +359,97 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderRadius: Radii.lg,
     padding: Spacing.base,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   header: {
-    marginBottom: Spacing.sm,
-  },
-  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
+    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  headerLeft: {
+    flex: 1,
+    flexShrink: 1,
   },
   customerName: {
     fontFamily: Typography.family.bold,
-    fontSize: Typography.size.lg,
+    fontSize: 19,
     color: Colors.textPrimary,
-  },
-  headerBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
+    lineHeight: 24,
   },
   orderNumber: {
     fontFamily: Typography.family.regular,
-    fontSize: Typography.size.sm,
+    fontSize: 13,
     color: Colors.textSecondary,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: Radii.sm,
-  },
-  statusText: {
-    fontFamily: Typography.family.bold,
-    fontSize: 10,
-  },
-  subBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.primaryMuted,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Radii.sm,
-  },
-  subText: {
-    fontFamily: Typography.family.bold,
-    fontSize: 10,
-    color: Colors.primary,
-  },
-  slotBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.surfaceHighlight,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: Radii.sm,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  slotText: {
-    fontFamily: Typography.family.medium,
-    fontSize: 10,
-    color: Colors.textSecondary,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginBottom: Spacing.sm,
+    marginTop: 2,
   },
   itemsList: {
-    gap: Spacing.xs,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.sm,
-  },
-  itemQuantity: {
-    fontFamily: Typography.family.bold,
-    fontSize: Typography.size.base,
-    color: Colors.textPrimary,
-    width: 24,
-  },
-  itemDetails: {
-    flex: 1,
-  },
-  itemName: {
-    fontFamily: Typography.family.medium,
-    fontSize: Typography.size.base,
-    color: Colors.textPrimary,
-  },
-  itemNotes: {
-    fontFamily: Typography.family.regular,
-    fontSize: Typography.size.sm,
-    color: Colors.warning,
-    marginTop: 2,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: Colors.divider,
   },
   orderNotes: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.xs,
+    alignItems: 'center',
+    gap: 6,
     marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    padding: Spacing.sm,
+    backgroundColor: Colors.surfaceRaised,
+    borderRadius: Radii.sm,
   },
   orderNotesText: {
     flex: 1,
     fontFamily: Typography.family.regular,
-    fontSize: Typography.size.sm,
+    fontSize: 13,
     color: Colors.textSecondary,
     fontStyle: 'italic',
   },
-  actionContainer: {
-    marginTop: Spacing.base,
-  },
   actionButton: {
-    paddingVertical: Spacing.sm,
-    borderRadius: Radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionText: {
-    fontFamily: Typography.family.bold,
-    fontSize: Typography.size.base,
-    color: Colors.background,
-  },
-  disabledActionNote: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
-    backgroundColor: Colors.transparent,
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: Spacing.base,
+    borderRadius: Radii.md,
+    minHeight: 44,
   },
-  disabledActionNoteText: {
+  actionButtonPrimary: {
+    backgroundColor: '#8B5CF6',
+  },
+  actionButtonSecondary: {
+    backgroundColor: Colors.surfaceRaised,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  actionButtonSuccess: {
+    backgroundColor: '#10B981',
+  },
+  actionText: {
+    fontFamily: Typography.family.bold,
+    fontSize: 15,
+    color: Colors.white,
+  },
+  noteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingTop: 4,
+  },
+  noteText: {
     fontFamily: Typography.family.medium,
-    fontSize: Typography.size.xs,
+    fontSize: 12,
+    color: '#F59E0B',
+  },
+  noteTextSecondary: {
+    fontFamily: Typography.family.medium,
+    fontSize: 12,
     color: Colors.textSecondary,
+    textAlign: 'center',
   },
 });

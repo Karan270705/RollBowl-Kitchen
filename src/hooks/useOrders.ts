@@ -17,9 +17,9 @@ export const useOrders = (stallId: string | undefined, operationsDate: string | 
 
 export const useWalkInSales = (stallId: string | undefined, operationsDate: string | undefined | null) => {
   return useQuery({
-    queryKey: stallId && operationsDate ? walkInKeys.list(stallId, operationsDate) : ['walk-in-sales', 'skip'],
-    queryFn: () => fetchWalkInSales(stallId!, operationsDate!),
-    enabled: !!stallId && !!operationsDate,
+    queryKey: stallId ? walkInKeys.list(stallId, operationsDate || 'all') : ['walk-in-sales', 'skip'],
+    queryFn: () => fetchWalkInSales(stallId!, operationsDate),
+    enabled: !!stallId,
   });
 };
 

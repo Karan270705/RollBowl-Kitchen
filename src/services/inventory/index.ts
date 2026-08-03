@@ -438,10 +438,10 @@ import { WalkInSale } from '@/src/types/models';
 
 export const fetchWalkInSales = async (
   stallId: string,
-  date: string
+  date?: string | null
 ): Promise<WalkInSale[]> => {
   // Query inventory_movements with walk_in_sale type, joined with related data
-  const { data, error } = await supabase
+  let query = supabase
     .from('inventory_movements')
     .select(`
       id,
@@ -471,13 +471,25 @@ export const fetchWalkInSales = async (
       )
     `)
     .eq('movement_type', 'walk_in_sale')
-    .eq('inventory_batches.stall_id', stallId)
-    .eq('inventory_batches.inventory_date', date)
-    .order('created_at', { ascending: false });
+    .eq('inventory_batches.stall_id', stallId);
+
+  if (date && date !== 'all' && date !== 'null' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    query = query.eq('inventory_batches.inventory_date', date);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
 
   if (error) {
-    console.error('[fetchWalkInSales] Error:', error);
-    throw parseInventoryError(error);
+    console.error('[FETCH WALK-IN SALES ERROR]', {
+      message: error?.message,
+      code: error?.code,
+      details: error?.details,
+      hint: error?.hint,
+      fromDate: date,
+      toDate: date,
+      rawFilters: { stallId, date },
+    });
+    throw new Error('Could not load walk-in sales.');
   }
 
   if (!data || data.length === 0) return [];

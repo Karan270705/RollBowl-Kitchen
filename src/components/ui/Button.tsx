@@ -10,9 +10,15 @@ import {
 import * as Haptics from 'expo-haptics';
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'danger'
+  | 'success';
 
-interface ButtonProps {
+export interface ButtonProps {
   title: string;
   onPress: () => void;
   variant?: ButtonVariant;
@@ -21,6 +27,7 @@ interface ButtonProps {
   fullWidth?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
+  accessibilityLabel?: string;
 }
 
 export function Button({
@@ -32,6 +39,7 @@ export function Button({
   fullWidth = false,
   style,
   textStyle,
+  accessibilityLabel,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
 
@@ -53,11 +61,18 @@ export function Button({
       onPress={handlePress}
       disabled={isDisabled}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
     >
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'outline' || variant === 'ghost' ? Colors.primary : Colors.white}
+          color={
+            variant === 'outline' || variant === 'ghost'
+              ? Colors.primary
+              : Colors.white
+          }
         />
       ) : (
         <Text
@@ -75,6 +90,9 @@ export function Button({
   );
 }
 
+// Reusable AppButton alias
+export const AppButton = Button;
+
 const styles = StyleSheet.create({
   base: {
     paddingVertical: Spacing.md,
@@ -82,7 +100,8 @@ const styles = StyleSheet.create({
     borderRadius: Radii.md,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 44,
+    minWidth: 44,
   },
   fullWidth: {
     width: '100%',
@@ -118,6 +137,9 @@ const variantStyles: Record<ButtonVariant, ViewStyle> = {
   danger: {
     backgroundColor: Colors.error,
   },
+  success: {
+    backgroundColor: Colors.success,
+  },
 };
 
 const variantTextStyles: Record<ButtonVariant, TextStyle> = {
@@ -125,7 +147,7 @@ const variantTextStyles: Record<ButtonVariant, TextStyle> = {
     color: Colors.white,
   },
   secondary: {
-    color: Colors.textInverse,
+    color: Colors.white,
   },
   outline: {
     color: Colors.primary,
@@ -134,6 +156,9 @@ const variantTextStyles: Record<ButtonVariant, TextStyle> = {
     color: Colors.primary,
   },
   danger: {
+    color: Colors.white,
+  },
+  success: {
     color: Colors.white,
   },
 };

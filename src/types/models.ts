@@ -86,6 +86,7 @@ export interface OrderItem {
   totalPrice: number;
   specialInstructions?: string;
   subscriptionId?: string;
+  creditsUsed?: number;
   createdAt: string;
 }
 
@@ -108,6 +109,8 @@ export interface Order {
   tax: number;
   discount: number;
   total: number;
+  subscriptionPlanName?: string;
+  creditsUsed?: number;
   notes?: string;
   expectedPickupSlot?: string;
   pickupDate: string;
