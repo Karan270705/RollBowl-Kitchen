@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { buildCsvString } from '@/src/utils/export/csv';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { getTodayISTDateString } from '@/src/utils/operationalDate';
 
 export interface ExportProgress {
   stage: string;
@@ -117,7 +118,9 @@ export const fetchOrdersForExport = async (
   const { data: subsData } = await supabase
     .from('subscriptions')
     .select('id, user_id, plan_name, total_meals, meals_per_day, remaining_meals, consumed_meals, purchase_price, currency, start_date, end_date, status, created_at')
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .lte('start_date', getTodayISTDateString())
+    .gte('end_date', getTodayISTDateString());
   const subscriptions = subsData || [];
 
   let purchaseRequests: any[] = [];

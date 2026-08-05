@@ -1,5 +1,6 @@
 import { supabase } from '@/src/lib/supabase';
 import { useQuery } from '@tanstack/react-query';
+import { getTodayISTDateString } from '@/src/utils/operationalDate';
 
 export interface SubscriberListItem {
   id: string; // Subscription ID
@@ -51,14 +52,22 @@ export const fetchSubscribersList = async (): Promise<SubscriberListItem[]> => {
 
   if (error) throw error;
 
+  const todayIST = getTodayISTDateString();
+
   return (data || []).map((sub: any) => {
     const rawName = sub.users?.name?.trim();
+    
+    let computedStatus = sub.status;
+    if (computedStatus === 'active' && sub.end_date < todayIST) {
+      computedStatus = 'expired';
+    }
+
     return {
       id: sub.id,
       userId: sub.user_id,
       customerName: rawName ? rawName : 'No Profile Name',
       planName: sub.plan_name,
-      status: sub.status,
+      status: computedStatus,
       remainingMeals: sub.remaining_meals ?? 0,
       totalMeals: sub.total_meals ?? 20,
       consumedMeals: sub.consumed_meals ?? 0,
@@ -107,13 +116,19 @@ export const fetchSubscriberDetails = async (subscriptionId: string): Promise<Su
 
   const rawName = subData.users?.name?.trim();
   const customerName = rawName ? rawName : 'No Profile Name';
+  const todayIST = getTodayISTDateString();
+
+  let computedStatus = subData.status;
+  if (computedStatus === 'active' && subData.end_date < todayIST) {
+    computedStatus = 'expired';
+  }
 
   return {
     id: subData.id,
     userId: subData.user_id,
     customerName,
     planName: subData.plan_name,
-    status: subData.status,
+    status: computedStatus,
     remainingMeals: subData.remaining_meals ?? 0,
     startDate: subData.start_date,
     endDate: subData.end_date,

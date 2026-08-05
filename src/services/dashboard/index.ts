@@ -6,6 +6,7 @@ import { fetchOrders } from '@/src/services/orders';
 import { fetchWalkInSales } from '@/src/services/inventory';
 import { getHolidayForDate } from '@/src/services/holidays';
 import { dashboardKeys } from '@/src/constants/queryKeys';
+import { getTodayISTDateString } from '@/src/utils/operationalDate';
 
 export interface DashboardMetrics {
   executionOrders: {
@@ -63,7 +64,9 @@ export const fetchDashboardMetrics = async (
   const { count: activeSubCount, error: subError } = await supabase
     .from('subscriptions')
     .select('*', { count: 'exact', head: true })
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .lte('start_date', getTodayISTDateString())
+    .gte('end_date', getTodayISTDateString());
 
   if (subError) throw subError;
 

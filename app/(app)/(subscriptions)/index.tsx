@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Alert } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Modal, Alert, AppState, AppStateStatus } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
@@ -29,7 +29,7 @@ const getFriendlyRequestStatus = (status: string): string => {
 export default function SubscriptionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { data: subscribers = [], isLoading, error } = useSubscribersList();
+  const { data: subscribers = [], isLoading, error, refetch: refetchSubscribers } = useSubscribersList();
   const { data: requests = [], isLoading: isLoadingRequests, error: requestsError, refetch: refetchRequests } = useSubscriptionRequests();
 
   const approveSubMutation = useApproveSubscriptionPurchase();
@@ -41,6 +41,17 @@ export default function SubscriptionsScreen() {
 
   const [rejectingRequestId, setRejectingRequestId] = useState<string | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        refetchSubscribers();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [refetchSubscribers]);
 
   const activeCount = subscribers.filter(s => s.status === 'active').length;
   const expiredCount = subscribers.filter(s => s.status === 'expired').length;

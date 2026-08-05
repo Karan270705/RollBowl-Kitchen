@@ -79,11 +79,27 @@ export const useUpdateOrderStatus = (stallId: string | undefined, operationsDate
   return useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: Order['status'] }) => 
       updateOrderStatus(orderId, status),
-    onMutate: async () => {
-      // No optimistic updates because we must wait for backend validation (e.g., cash guard)
-      return {};
+    onMutate: async ({ orderId, status }) => {
+      const queryKey = stallId ? ordersKeys.list(stallId, operationsDate || null) : ['orders', 'skip'];
+      await queryClient.cancelQueries({ queryKey });
+
+      const previousOrders = queryClient.getQueryData<Order[]>(queryKey);
+
+      if (previousOrders) {
+        queryClient.setQueryData<Order[]>(queryKey, (old) => {
+          if (!old) return old;
+          return old.map((order) =>
+            order.id === orderId ? { ...order, status } : order
+          );
+        });
+      }
+
+      return { previousOrders, queryKey };
     },
-    onError: (err) => {
+    onError: (err, variables, context) => {
+      if (context?.previousOrders && context?.queryKey) {
+        queryClient.setQueryData(context.queryKey, context.previousOrders);
+      }
       const message = normalizeError(err);
       Alert.alert('Action Failed', message);
     },
@@ -106,10 +122,27 @@ export const useUpdateOrderPaymentStatus = (stallId: string | undefined, operati
   return useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: Order['paymentStatus'] }) => 
       updateOrderPaymentStatus(orderId, status),
-    onMutate: async () => {
-      return {};
+    onMutate: async ({ orderId, status }) => {
+      const queryKey = stallId ? ordersKeys.list(stallId, operationsDate || null) : ['orders', 'skip'];
+      await queryClient.cancelQueries({ queryKey });
+
+      const previousOrders = queryClient.getQueryData<Order[]>(queryKey);
+
+      if (previousOrders) {
+        queryClient.setQueryData<Order[]>(queryKey, (old) => {
+          if (!old) return old;
+          return old.map((order) =>
+            order.id === orderId ? { ...order, paymentStatus: status } : order
+          );
+        });
+      }
+
+      return { previousOrders, queryKey };
     },
-    onError: (err) => {
+    onError: (err, variables, context) => {
+      if (context?.previousOrders && context?.queryKey) {
+        queryClient.setQueryData(context.queryKey, context.previousOrders);
+      }
       const message = normalizeError(err);
       Alert.alert('Action Failed', message);
     },
