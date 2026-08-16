@@ -244,11 +244,11 @@ export async function fetchPublishedMenuMeals(stallId: string, date: string): Pr
 }
 
 export const createDraftInventoryBatch = async (
-  date: string | Date,
-  windowStart: string | Date,
-  windowEnd: string | Date,
+  deliveryStart: Date,
+  deliveryEnd: Date,
   items: { mealId: string; loadedQuantity: number }[],
   stallId?: string,
+  scheduleId?: string,
   notes?: string
 ): Promise<string> => {
   const actualStallId = stallId || await getPrimaryStallId();
@@ -258,16 +258,18 @@ export const createDraftInventoryBatch = async (
     throw new Error("You must be logged in to create a batch.");
   }
 
-  const dDate = new Date(date);
-  const dStart = new Date(windowStart);
-  const dEnd = new Date(windowEnd);
-
-  if (isNaN(dDate.getTime())) throw new Error("date must be valid");
+  const dStart = deliveryStart;
+  const dEnd = deliveryEnd;
+  const dDate = new Date(dStart); // Legacy inventory_date is just the start date
+  
   if (isNaN(dStart.getTime()) || isNaN(dEnd.getTime())) throw new Error("start and end must exist");
   if (dEnd <= dStart) throw new Error("end time must be later than start time");
   if (!items || items.length === 0 || !items.some(i => i.loadedQuantity > 0)) {
     throw new Error("at least one meal must have loaded_quantity > 0");
   }
+
+  // Optional validation: If we know the ordering cutoff (from schedule), we could check it here.
+  // But we'll rely on the UI or backend triggers for that.
 
   const inventory_date = formatLocalDate(dDate);
   const window_start = formatLocalTime(dStart);
@@ -317,6 +319,22 @@ export const createDraftInventoryBatch = async (
         console.error('CRITICAL: Failed to clean up partial draft batch:', cleanupError);
       }
       throw parseInventoryError(itemsError);
+    }
+  }
+
+  // Persist exact Delivery bounds to the menu schedule
+  if (scheduleId) {
+    const { error: scheduleUpdateError } = await supabase
+      .from('menu_schedules')
+      .update({
+        delivery_start_at: dStart.toISOString(),
+        delivery_end_at: dEnd.toISOString(),
+      })
+      .eq('id', scheduleId);
+
+    if (scheduleUpdateError) {
+      console.error('Failed to update menu schedule delivery times:', scheduleUpdateError);
+      // We don't fail the whole batch creation here, but we could if strict consistency is required.
     }
   }
 

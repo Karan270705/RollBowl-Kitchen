@@ -285,14 +285,30 @@ export const useLiveInventoryStatus = (batchId: string | undefined) => {
 };
 
 // Mutations
+interface CreateDraftPayload {
+  deliveryStart: Date;
+  deliveryEnd: Date;
+  items: { mealId: string; loadedQuantity: number }[];
+  stallId?: string;
+  scheduleId?: string;
+  notes?: string;
+}
+
 export const useCreateDraftBatch = () => {
   const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async (vars: { date: string | Date, windowStart: string | Date, windowEnd: string | Date, items: { mealId: string, loadedQuantity: number }[], stallId?: string, notes?: string }) => {
-      return createDraftInventoryBatch(vars.date, vars.windowStart, vars.windowEnd, vars.items, vars.stallId, vars.notes);
-    },
+    mutationFn: (payload: CreateDraftPayload) =>
+      createDraftInventoryBatch(
+        payload.deliveryStart,
+        payload.deliveryEnd,
+        payload.items,
+        payload.stallId,
+        payload.scheduleId,
+        payload.notes
+      ),
     onSuccess: (batchId, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['inventory-batches', vars.stallId, formatLocalDate(vars.date)] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-batches', vars.stallId, formatLocalDate(vars.deliveryStart)] });
     }
   });
 };

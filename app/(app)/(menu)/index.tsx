@@ -12,10 +12,13 @@ import {
   useMenuForDate,
   useMealsPool,
   useSaveMenuMeals,
+  useUpdateMenuSchedule,
   useRemoveMealFromMenu,
   useCopyMenu,
 } from '@/src/hooks/useMenu';
 import { enableMeal } from '@/src/services/menu';
+import { generateMenuScheduleTimestamps } from '@/src/utils/operationalDate';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useHolidayForDate } from '@/src/hooks/useHolidays';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -37,11 +40,51 @@ export default function MenuScreen() {
 
   // Mutations
   const { mutate: saveMeals, isPending: saving } = useSaveMenuMeals(selectedDateStr);
+  const { mutate: updateMenu } = useUpdateMenuSchedule(selectedDateStr);
   const { mutate: removeMeal } = useRemoveMealFromMenu(selectedDateStr);
   const { mutate: copyMenuMutate, isPending: copying } = useCopyMenu(selectedDateStr);
 
   const schedule = menuData?.schedule;
   const items = menuData?.items || [];
+  
+  // Local State for Scheduling
+  const [orderingStart, setOrderingStart] = useState<Date | null>(null);
+  const [orderingEnd, setOrderingEnd] = useState<Date | null>(null);
+  const [showStartPicker, setShowStartPicker] = useState<{ mode: 'date' | 'time', visible: boolean }>({ mode: 'date', visible: false });
+  const [showEndPicker, setShowEndPicker] = useState<{ mode: 'date' | 'time', visible: boolean }>({ mode: 'date', visible: false });
+  const [isEditingSchedule, setIsEditingSchedule] = useState(false);
+
+  React.useEffect(() => {
+    if (schedule?.visibleFrom && schedule?.orderCutoff) {
+      setOrderingStart(new Date(schedule.visibleFrom));
+      setOrderingEnd(new Date(schedule.orderCutoff));
+    } else {
+      const defaults = generateMenuScheduleTimestamps(selectedDateStr);
+      setOrderingStart(new Date(defaults.visibleFrom));
+      setOrderingEnd(new Date(defaults.orderCutoff));
+    }
+    setIsEditingSchedule(false);
+  }, [schedule, selectedDateStr]);
+
+  const handleSaveSchedule = () => {
+    if (!orderingStart || !orderingEnd) return;
+    if (orderingEnd <= orderingStart) {
+      Alert.alert('Validation Error', 'Ordering End must be after Ordering Start.');
+      return;
+    }
+    if (schedule?.id) {
+      updateMenu({
+        scheduleId: schedule.id,
+        visibleFrom: orderingStart.toISOString(),
+        orderCutoff: orderingEnd.toISOString()
+      }, {
+        onSuccess: () => setIsEditingSchedule(false),
+        onError: (err: any) => Alert.alert('Error', err.message)
+      });
+    } else {
+      setIsEditingSchedule(false);
+    }
+  };
   
   const currentItemIds = items.map((i) => i.mealId);
 
@@ -71,7 +114,12 @@ export default function MenuScreen() {
       );
       return;
     }
-    saveMeals({ scheduleId: schedule?.id || null, mealIds });
+    saveMeals({ 
+      scheduleId: schedule?.id || null, 
+      mealIds,
+      orderingStart: orderingStart?.toISOString(),
+      orderingEnd: orderingEnd?.toISOString()
+    });
   };
 
   const handleRemoveMeal = (mealId: string) => {
@@ -159,6 +207,54 @@ export default function MenuScreen() {
         </View>
       ) : null}
 
+      {!menuLoading && (
+        <View style={styles.scheduleCard}>
+          <View style={styles.scheduleHeader}>
+            <Ionicons name="time-outline" size={20} color={Colors.textPrimary} />
+            <Text style={styles.scheduleTitle}>Ordering Window</Text>
+            {!isLocked && (
+              isEditingSchedule ? (
+                <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                  <Button variant="ghost" title="Cancel" onPress={() => setIsEditingSchedule(false)} style={{ paddingHorizontal: Spacing.sm, minHeight: 0 }} />
+                  <Button variant="primary" title="Save" onPress={handleSaveSchedule} style={{ paddingHorizontal: Spacing.sm, minHeight: 0 }} />
+                </View>
+              ) : (
+                <Button variant="outline" title="Edit" onPress={() => setIsEditingSchedule(true)} style={{ paddingHorizontal: Spacing.sm, minHeight: 0 }} />
+              )
+            )}
+          </View>
+          
+          <View style={styles.scheduleRow}>
+            <View style={styles.scheduleCol}>
+              <Text style={styles.scheduleLabel}>Start</Text>
+              {isEditingSchedule ? (
+                <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
+                  <Button variant="outline" title={orderingStart ? orderingStart.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '...'} onPress={() => setShowStartPicker({ mode: 'date', visible: true })} style={{ paddingHorizontal: Spacing.xs, minHeight: 0, flex: 1 }} />
+                  <Button variant="outline" title={orderingStart ? orderingStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'} onPress={() => setShowStartPicker({ mode: 'time', visible: true })} style={{ paddingHorizontal: Spacing.xs, minHeight: 0, flex: 1 }} />
+                </View>
+              ) : (
+                <Text style={styles.scheduleValue}>
+                  {orderingStart ? `${orderingStart.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${orderingStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '...'}
+                </Text>
+              )}
+            </View>
+            <View style={styles.scheduleCol}>
+              <Text style={styles.scheduleLabel}>End</Text>
+              {isEditingSchedule ? (
+                <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
+                  <Button variant="outline" title={orderingEnd ? orderingEnd.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '...'} onPress={() => setShowEndPicker({ mode: 'date', visible: true })} style={{ paddingHorizontal: Spacing.xs, minHeight: 0, flex: 1 }} />
+                  <Button variant="outline" title={orderingEnd ? orderingEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'} onPress={() => setShowEndPicker({ mode: 'time', visible: true })} style={{ paddingHorizontal: Spacing.xs, minHeight: 0, flex: 1 }} />
+                </View>
+              ) : (
+                <Text style={styles.scheduleValue}>
+                  {orderingEnd ? `${orderingEnd.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${orderingEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '...'}
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
+
       {menuLoading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={Colors.primary} />
@@ -223,6 +319,45 @@ export default function MenuScreen() {
         initialSelectedIds={currentItemIds}
         onSave={handleSaveMeals}
       />
+
+      {showStartPicker.visible && orderingStart && (
+        <DateTimePicker
+          value={orderingStart}
+          mode={showStartPicker.mode}
+          display="default"
+          onChange={(e, d) => {
+            setShowStartPicker({ ...showStartPicker, visible: false });
+            if (d) {
+              const newDate = new Date(orderingStart);
+              if (showStartPicker.mode === 'date') {
+                newDate.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+              } else {
+                newDate.setHours(d.getHours(), d.getMinutes());
+              }
+              setOrderingStart(newDate);
+            }
+          }}
+        />
+      )}
+      {showEndPicker.visible && orderingEnd && (
+        <DateTimePicker
+          value={orderingEnd}
+          mode={showEndPicker.mode}
+          display="default"
+          onChange={(e, d) => {
+            setShowEndPicker({ ...showEndPicker, visible: false });
+            if (d) {
+              const newDate = new Date(orderingEnd);
+              if (showEndPicker.mode === 'date') {
+                newDate.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+              } else {
+                newDate.setHours(d.getHours(), d.getMinutes());
+              }
+              setOrderingEnd(newDate);
+            }
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -336,5 +471,47 @@ const styles = StyleSheet.create({
     fontSize: Typography.size.sm,
     color: Colors.warning,
     flex: 1,
+  },
+  scheduleCard: {
+    backgroundColor: Colors.surface,
+    marginHorizontal: Spacing.base,
+    marginBottom: Spacing.base,
+    borderRadius: Radii.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: Spacing.base,
+  },
+  scheduleHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  scheduleTitle: {
+    fontFamily: Typography.family.semiBold,
+    fontSize: Typography.size.base,
+    color: Colors.textPrimary,
+    flex: 1,
+    marginLeft: Spacing.sm,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.sm,
+  },
+  scheduleCol: {
+    flex: 1,
+    gap: 4,
+  },
+  scheduleLabel: {
+    fontFamily: Typography.family.medium,
+    fontSize: Typography.size.xs,
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+  },
+  scheduleValue: {
+    fontFamily: Typography.family.medium,
+    fontSize: Typography.size.sm,
+    color: Colors.textPrimary,
   },
 });

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getMenuForDate,
   createMenuSchedule,
+  updateMenuSchedule,
   saveMenuMeals,
   removeMealFromMenu,
   copyMenu,
@@ -36,14 +37,27 @@ export const useSaveMenuMeals = (date: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ scheduleId, mealIds }: { scheduleId: string | null; mealIds: string[] }) => {
+    mutationFn: async ({ scheduleId, mealIds, orderingStart, orderingEnd }: { scheduleId: string | null; mealIds: string[]; orderingStart?: string; orderingEnd?: string }) => {
       let activeScheduleId = scheduleId;
       if (!activeScheduleId) {
-        const newSchedule = await createMenuSchedule(date);
+        const newSchedule = await createMenuSchedule(date, undefined, orderingStart, orderingEnd);
         activeScheduleId = newSchedule.id;
       }
       await saveMenuMeals(activeScheduleId, mealIds);
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['menu', date] });
+      queryClient.invalidateQueries({ queryKey: ['menu', 'operational-status'] });
+    },
+  });
+};
+
+export const useUpdateMenuSchedule = (date: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ scheduleId, visibleFrom, orderCutoff }: { scheduleId: string; visibleFrom: string; orderCutoff: string }) =>
+      updateMenuSchedule(scheduleId, visibleFrom, orderCutoff),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menu', date] });
       queryClient.invalidateQueries({ queryKey: ['menu', 'operational-status'] });

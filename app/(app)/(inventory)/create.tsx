@@ -44,9 +44,8 @@ export default function CreateBatchScreen() {
     }
   }, [targetDateStr, isResolving, date]);
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showStartPicker, setShowStartPicker] = useState<{ mode: 'date' | 'time', visible: boolean }>({ mode: 'date', visible: false });
+  const [showEndPicker, setShowEndPicker] = useState<{ mode: 'date' | 'time', visible: boolean }>({ mode: 'date', visible: false });
 
   const [availableMeals, setAvailableMeals] = useState<any[]>([]);
   const [hasPublishedMenu, setHasPublishedMenu] = useState(true);
@@ -110,11 +109,11 @@ export default function CreateBatchScreen() {
       }
 
       const batchId = await createDraft({
-        date,
-        windowStart,
-        windowEnd,
+        deliveryStart: windowStart,
+        deliveryEnd: windowEnd,
         items: itemsPayload,
         stallId,
+        scheduleId,
       });
 
       router.replace(`/(app)/(inventory)/${batchId}`);
@@ -175,17 +174,22 @@ export default function CreateBatchScreen() {
         <Card style={styles.section}>
           <Text style={styles.sectionTitle}>Delivery Window</Text>
           
-          <Text style={styles.label}>Date</Text>
-          <Button variant="outline" title={date ? formatDisplayDate(date) : 'Loading...'} onPress={() => setShowDatePicker(true)} style={styles.pickerBtn} disabled={!date} />
-          
           <View style={styles.row}>
             <View style={{ flex: 1, marginRight: Spacing.xs }}>
-              <Text style={styles.label}>Start Time</Text>
-              <Button variant="outline" title={windowStart ? windowStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Loading...'} onPress={() => setShowStartPicker(true)} style={styles.pickerBtn} disabled={!windowStart} />
+              <Text style={styles.label}>Start</Text>
+              <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
+                <Button variant="outline" title={windowStart ? windowStart.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '...'} onPress={() => setShowStartPicker({ mode: 'date', visible: true })} style={[styles.pickerBtn, { flex: 1 }] as any} disabled={!windowStart} />
+                <Button variant="outline" title={windowStart ? windowStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'} onPress={() => setShowStartPicker({ mode: 'time', visible: true })} style={[styles.pickerBtn, { flex: 1 }] as any} disabled={!windowStart} />
+              </View>
             </View>
-            <View style={{ flex: 1, marginLeft: Spacing.xs }}>
-              <Text style={styles.label}>End Time</Text>
-              <Button variant="outline" title={windowEnd ? windowEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Loading...'} onPress={() => setShowEndPicker(true)} style={styles.pickerBtn} disabled={!windowEnd} />
+          </View>
+          <View style={styles.row}>
+            <View style={{ flex: 1, marginRight: Spacing.xs }}>
+              <Text style={styles.label}>End</Text>
+              <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
+                <Button variant="outline" title={windowEnd ? windowEnd.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '...'} onPress={() => setShowEndPicker({ mode: 'date', visible: true })} style={[styles.pickerBtn, { flex: 1 }] as any} disabled={!windowEnd} />
+                <Button variant="outline" title={windowEnd ? windowEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'} onPress={() => setShowEndPicker({ mode: 'time', visible: true })} style={[styles.pickerBtn, { flex: 1 }] as any} disabled={!windowEnd} />
+              </View>
             </View>
           </View>
         </Card>
@@ -277,22 +281,38 @@ export default function CreateBatchScreen() {
         />
       </View>
 
-      {showDatePicker && date && (
+      {showStartPicker.visible && windowStart && (
         <DateTimePicker
-          value={date} mode="date" display="default"
-          onChange={(e, d) => { setShowDatePicker(false); if(d) { setDate(d); setSelectedItems({}); } }}
+          value={windowStart} mode={showStartPicker.mode} display="default"
+          onChange={(e, d) => { 
+            setShowStartPicker({ ...showStartPicker, visible: false }); 
+            if(d) { 
+              const nd = new Date(windowStart); 
+              if (showStartPicker.mode === 'date') {
+                nd.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+              } else {
+                nd.setHours(d.getHours(), d.getMinutes()); 
+              }
+              setWindowStart(nd); 
+            } 
+          }}
         />
       )}
-      {showStartPicker && windowStart && (
+      {showEndPicker.visible && windowEnd && (
         <DateTimePicker
-          value={windowStart} mode="time" display="default"
-          onChange={(e, d) => { setShowStartPicker(false); if(d) { const nd = new Date(windowStart); nd.setHours(d.getHours(), d.getMinutes()); setWindowStart(nd); } }}
-        />
-      )}
-      {showEndPicker && windowEnd && (
-        <DateTimePicker
-          value={windowEnd} mode="time" display="default"
-          onChange={(e, d) => { setShowEndPicker(false); if(d) { const nd = new Date(windowEnd); nd.setHours(d.getHours(), d.getMinutes()); setWindowEnd(nd); } }}
+          value={windowEnd} mode={showEndPicker.mode} display="default"
+          onChange={(e, d) => { 
+            setShowEndPicker({ ...showEndPicker, visible: false }); 
+            if(d) { 
+              const nd = new Date(windowEnd); 
+              if (showEndPicker.mode === 'date') {
+                nd.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+              } else {
+                nd.setHours(d.getHours(), d.getMinutes()); 
+              }
+              setWindowEnd(nd); 
+            } 
+          }}
         />
       )}
     </View>

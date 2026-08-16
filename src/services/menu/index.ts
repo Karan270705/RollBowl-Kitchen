@@ -90,11 +90,18 @@ export const getMenuForDate = async (date: string, stallId?: string): Promise<{ 
   return { schedule, items };
 };
 
-export const createMenuSchedule = async (date: string, stallId?: string): Promise<MenuSchedule> => {
+export const createMenuSchedule = async (date: string, stallId?: string, explicitVisibleFrom?: string, explicitOrderCutoff?: string): Promise<MenuSchedule> => {
   const actualStallId = stallId || await getPrimaryStallId();
   
-  // Single Source of Truth: derive visible_from and order_cutoff using generateMenuScheduleTimestamps
-  const { visibleFrom, orderCutoff } = generateMenuScheduleTimestamps(date);
+  // Use explicit timestamps if provided, otherwise fallback to defaults
+  let visibleFrom = explicitVisibleFrom;
+  let orderCutoff = explicitOrderCutoff;
+  
+  if (!visibleFrom || !orderCutoff) {
+    const defaults = generateMenuScheduleTimestamps(date);
+    if (!visibleFrom) visibleFrom = defaults.visibleFrom;
+    if (!orderCutoff) orderCutoff = defaults.orderCutoff;
+  }
 
   const { data, error } = await supabase
     .from('menu_schedules')
@@ -123,6 +130,18 @@ export const createMenuSchedule = async (date: string, stallId?: string): Promis
 };
 
 // ─── Menu Schedule Items ─────────────────────────────────────
+
+export const updateMenuSchedule = async (scheduleId: string, visibleFrom: string, orderCutoff: string): Promise<void> => {
+  const { error } = await supabase
+    .from('menu_schedules')
+    .update({
+      visible_from: visibleFrom,
+      order_cutoff: orderCutoff
+    })
+    .eq('id', scheduleId);
+
+  if (error) throw error;
+};
 
 export const saveMenuMeals = async (scheduleId: string, mealIds: string[]): Promise<void> => {
   if (mealIds.length === 0) return;
