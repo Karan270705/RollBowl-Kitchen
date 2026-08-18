@@ -46,17 +46,23 @@ export function getYesterdayISTDateString(baseDateStr: string): string {
  * Derives `visibleFrom` from OPERATIONAL_ROLLOVER_TIME on the previous calendar day,
  * and `orderCutoff` from ORDER_CUTOFF_TIME on the target menu date.
  */
-export function generateMenuScheduleTimestamps(menuDateStr: string): { visibleFrom: string; orderCutoff: string } {
+export function generateMenuScheduleTimestamps(menuDateStr: string): { visibleFrom: string; orderCutoff: string; deliveryStartAt: string; deliveryEndAt: string } {
   const previousDayStr = getYesterdayISTDateString(menuDateStr);
   const rolloverTimeStr = AppConfig.BUSINESS.OPERATIONAL_ROLLOVER_TIME || '15:00';
   const cutoffTimeStr = AppConfig.BUSINESS.ORDER_CUTOFF_TIME || '10:00';
+  const pickupStartStr = AppConfig.BUSINESS.PICKUP_START_TIME || '12:00';
+  const pickupEndStr = AppConfig.BUSINESS.PICKUP_END_TIME || '14:00';
 
   const visibleFromDate = parseTimeToDateIST(previousDayStr, rolloverTimeStr);
   const orderCutoffDate = parseTimeToDateIST(menuDateStr, cutoffTimeStr);
+  const deliveryStartDate = parseTimeToDateIST(menuDateStr, pickupStartStr);
+  const deliveryEndDate = parseTimeToDateIST(menuDateStr, pickupEndStr);
 
   return {
     visibleFrom: visibleFromDate.toISOString(),
     orderCutoff: orderCutoffDate.toISOString(),
+    deliveryStartAt: deliveryStartDate.toISOString(),
+    deliveryEndAt: deliveryEndDate.toISOString(),
   };
 }
 

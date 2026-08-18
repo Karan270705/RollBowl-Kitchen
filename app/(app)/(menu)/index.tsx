@@ -50,33 +50,47 @@ export default function MenuScreen() {
   // Local State for Scheduling
   const [orderingStart, setOrderingStart] = useState<Date | null>(null);
   const [orderingEnd, setOrderingEnd] = useState<Date | null>(null);
+  const [deliveryStart, setDeliveryStart] = useState<Date | null>(null);
+  const [deliveryEnd, setDeliveryEnd] = useState<Date | null>(null);
   const [showStartPicker, setShowStartPicker] = useState<{ mode: 'date' | 'time', visible: boolean }>({ mode: 'date', visible: false });
   const [showEndPicker, setShowEndPicker] = useState<{ mode: 'date' | 'time', visible: boolean }>({ mode: 'date', visible: false });
+  const [showDeliveryStartPicker, setShowDeliveryStartPicker] = useState<{ mode: 'date' | 'time', visible: boolean }>({ mode: 'date', visible: false });
+  const [showDeliveryEndPicker, setShowDeliveryEndPicker] = useState<{ mode: 'date' | 'time', visible: boolean }>({ mode: 'date', visible: false });
   const [isEditingSchedule, setIsEditingSchedule] = useState(false);
 
   React.useEffect(() => {
-    if (schedule?.visibleFrom && schedule?.orderCutoff) {
+    if (schedule?.visibleFrom && schedule?.orderCutoff && schedule?.deliveryStartAt && schedule?.deliveryEndAt) {
       setOrderingStart(new Date(schedule.visibleFrom));
       setOrderingEnd(new Date(schedule.orderCutoff));
+      setDeliveryStart(new Date(schedule.deliveryStartAt));
+      setDeliveryEnd(new Date(schedule.deliveryEndAt));
     } else {
       const defaults = generateMenuScheduleTimestamps(selectedDateStr);
       setOrderingStart(new Date(defaults.visibleFrom));
       setOrderingEnd(new Date(defaults.orderCutoff));
+      setDeliveryStart(new Date(defaults.deliveryStartAt));
+      setDeliveryEnd(new Date(defaults.deliveryEndAt));
     }
     setIsEditingSchedule(false);
   }, [schedule, selectedDateStr]);
 
   const handleSaveSchedule = () => {
-    if (!orderingStart || !orderingEnd) return;
+    if (!orderingStart || !orderingEnd || !deliveryStart || !deliveryEnd) return;
     if (orderingEnd <= orderingStart) {
       Alert.alert('Validation Error', 'Ordering End must be after Ordering Start.');
+      return;
+    }
+    if (deliveryEnd <= deliveryStart) {
+      Alert.alert('Validation Error', 'Delivery End must be after Delivery Start.');
       return;
     }
     if (schedule?.id) {
       updateMenu({
         scheduleId: schedule.id,
         visibleFrom: orderingStart.toISOString(),
-        orderCutoff: orderingEnd.toISOString()
+        orderCutoff: orderingEnd.toISOString(),
+        deliveryStartAt: deliveryStart.toISOString(),
+        deliveryEndAt: deliveryEnd.toISOString()
       }, {
         onSuccess: () => setIsEditingSchedule(false),
         onError: (err: any) => Alert.alert('Error', err.message)
@@ -118,7 +132,9 @@ export default function MenuScreen() {
       scheduleId: schedule?.id || null, 
       mealIds,
       orderingStart: orderingStart?.toISOString(),
-      orderingEnd: orderingEnd?.toISOString()
+      orderingEnd: orderingEnd?.toISOString(),
+      deliveryStart: deliveryStart?.toISOString(),
+      deliveryEnd: deliveryEnd?.toISOString()
     });
   };
 
@@ -252,6 +268,40 @@ export default function MenuScreen() {
               )}
             </View>
           </View>
+          
+          <View style={[styles.scheduleHeader, { marginTop: Spacing.base }]}>
+            <Ionicons name="bicycle-outline" size={20} color={Colors.textPrimary} />
+            <Text style={styles.scheduleTitle}>Delivery Window</Text>
+          </View>
+          
+          <View style={styles.scheduleRow}>
+            <View style={styles.scheduleCol}>
+              <Text style={styles.scheduleLabel}>Start</Text>
+              {isEditingSchedule ? (
+                <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
+                  <Button variant="outline" title={deliveryStart ? deliveryStart.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '...'} onPress={() => setShowDeliveryStartPicker({ mode: 'date', visible: true })} style={{ paddingHorizontal: Spacing.xs, minHeight: 0, flex: 1 }} />
+                  <Button variant="outline" title={deliveryStart ? deliveryStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'} onPress={() => setShowDeliveryStartPicker({ mode: 'time', visible: true })} style={{ paddingHorizontal: Spacing.xs, minHeight: 0, flex: 1 }} />
+                </View>
+              ) : (
+                <Text style={styles.scheduleValue}>
+                  {deliveryStart ? `${deliveryStart.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${deliveryStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '...'}
+                </Text>
+              )}
+            </View>
+            <View style={styles.scheduleCol}>
+              <Text style={styles.scheduleLabel}>End</Text>
+              {isEditingSchedule ? (
+                <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
+                  <Button variant="outline" title={deliveryEnd ? deliveryEnd.toLocaleDateString([], { month: 'short', day: 'numeric' }) : '...'} onPress={() => setShowDeliveryEndPicker({ mode: 'date', visible: true })} style={{ paddingHorizontal: Spacing.xs, minHeight: 0, flex: 1 }} />
+                  <Button variant="outline" title={deliveryEnd ? deliveryEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '...'} onPress={() => setShowDeliveryEndPicker({ mode: 'time', visible: true })} style={{ paddingHorizontal: Spacing.xs, minHeight: 0, flex: 1 }} />
+                </View>
+              ) : (
+                <Text style={styles.scheduleValue}>
+                  {deliveryEnd ? `${deliveryEnd.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${deliveryEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : '...'}
+                </Text>
+              )}
+            </View>
+          </View>
         </View>
       )}
 
@@ -354,6 +404,44 @@ export default function MenuScreen() {
                 newDate.setHours(d.getHours(), d.getMinutes());
               }
               setOrderingEnd(newDate);
+            }
+          }}
+        />
+      )}
+      {showDeliveryStartPicker.visible && deliveryStart && (
+        <DateTimePicker
+          value={deliveryStart}
+          mode={showDeliveryStartPicker.mode}
+          display="default"
+          onChange={(e, d) => {
+            setShowDeliveryStartPicker({ ...showDeliveryStartPicker, visible: false });
+            if (d) {
+              const newDate = new Date(deliveryStart);
+              if (showDeliveryStartPicker.mode === 'date') {
+                newDate.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+              } else {
+                newDate.setHours(d.getHours(), d.getMinutes());
+              }
+              setDeliveryStart(newDate);
+            }
+          }}
+        />
+      )}
+      {showDeliveryEndPicker.visible && deliveryEnd && (
+        <DateTimePicker
+          value={deliveryEnd}
+          mode={showDeliveryEndPicker.mode}
+          display="default"
+          onChange={(e, d) => {
+            setShowDeliveryEndPicker({ ...showDeliveryEndPicker, visible: false });
+            if (d) {
+              const newDate = new Date(deliveryEnd);
+              if (showDeliveryEndPicker.mode === 'date') {
+                newDate.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
+              } else {
+                newDate.setHours(d.getHours(), d.getMinutes());
+              }
+              setDeliveryEnd(newDate);
             }
           }}
         />

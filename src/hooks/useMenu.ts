@@ -37,10 +37,10 @@ export const useSaveMenuMeals = (date: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ scheduleId, mealIds, orderingStart, orderingEnd }: { scheduleId: string | null; mealIds: string[]; orderingStart?: string; orderingEnd?: string }) => {
+    mutationFn: async ({ scheduleId, mealIds, orderingStart, orderingEnd, deliveryStart, deliveryEnd }: { scheduleId: string | null; mealIds: string[]; orderingStart?: string; orderingEnd?: string; deliveryStart?: string; deliveryEnd?: string }) => {
       let activeScheduleId = scheduleId;
       if (!activeScheduleId) {
-        const newSchedule = await createMenuSchedule(date, undefined, orderingStart, orderingEnd);
+        const newSchedule = await createMenuSchedule(date, undefined, orderingStart, orderingEnd, deliveryStart, deliveryEnd);
         activeScheduleId = newSchedule.id;
       }
       await saveMenuMeals(activeScheduleId, mealIds);
@@ -56,8 +56,8 @@ export const useUpdateMenuSchedule = (date: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ scheduleId, visibleFrom, orderCutoff }: { scheduleId: string; visibleFrom: string; orderCutoff: string }) =>
-      updateMenuSchedule(scheduleId, visibleFrom, orderCutoff),
+    mutationFn: ({ scheduleId, visibleFrom, orderCutoff, deliveryStartAt, deliveryEndAt }: { scheduleId: string; visibleFrom: string; orderCutoff: string; deliveryStartAt: string; deliveryEndAt: string }) =>
+      updateMenuSchedule(scheduleId, visibleFrom, orderCutoff, deliveryStartAt, deliveryEndAt),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menu', date] });
       queryClient.invalidateQueries({ queryKey: ['menu', 'operational-status'] });

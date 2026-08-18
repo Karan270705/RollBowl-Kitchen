@@ -59,6 +59,8 @@ export interface MenuSchedule {
   menuDate: string; // YYYY-MM-DD
   visibleFrom: string; // ISO String
   orderCutoff: string; // ISO String
+  deliveryStartAt: string; // ISO String
+  deliveryEndAt: string; // ISO String
   isPublished: boolean;
   createdAt: string;
   updatedAt: string;

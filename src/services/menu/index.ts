@@ -44,6 +44,8 @@ export const getMenuForDate = async (date: string, stallId?: string): Promise<{ 
     menuDate: scheduleData.menu_date,
     visibleFrom: scheduleData.visible_from,
     orderCutoff: scheduleData.order_cutoff,
+    deliveryStartAt: scheduleData.delivery_start_at,
+    deliveryEndAt: scheduleData.delivery_end_at,
     isPublished: scheduleData.is_published,
     createdAt: scheduleData.created_at,
     updatedAt: scheduleData.updated_at,
@@ -90,17 +92,29 @@ export const getMenuForDate = async (date: string, stallId?: string): Promise<{ 
   return { schedule, items };
 };
 
-export const createMenuSchedule = async (date: string, stallId?: string, explicitVisibleFrom?: string, explicitOrderCutoff?: string): Promise<MenuSchedule> => {
+export const createMenuSchedule = async (date: string, stallId?: string, explicitVisibleFrom?: string, explicitOrderCutoff?: string, explicitDeliveryStart?: string, explicitDeliveryEnd?: string): Promise<MenuSchedule> => {
   const actualStallId = stallId || await getPrimaryStallId();
   
   // Use explicit timestamps if provided, otherwise fallback to defaults
   let visibleFrom = explicitVisibleFrom;
   let orderCutoff = explicitOrderCutoff;
+  let deliveryStartAt = explicitDeliveryStart;
+  let deliveryEndAt = explicitDeliveryEnd;
   
-  if (!visibleFrom || !orderCutoff) {
-    const defaults = generateMenuScheduleTimestamps(date);
+  if (!visibleFrom || !orderCutoff || !deliveryStartAt || !deliveryEndAt) {
+    const defaults = generateMenuScheduleTimestamps(date) as any;
     if (!visibleFrom) visibleFrom = defaults.visibleFrom;
     if (!orderCutoff) orderCutoff = defaults.orderCutoff;
+    
+    // Robust fallbacks in case Metro bundler cached the old operationalDate.ts logic
+    // 12:00 PM IST = 06:30 AM UTC = 23400000 ms
+    // 14:00 PM IST = 08:30 AM UTC = 30600000 ms
+    if (!deliveryStartAt) {
+      deliveryStartAt = defaults.deliveryStartAt || new Date(new Date(date).getTime() + 23400000).toISOString();
+    }
+    if (!deliveryEndAt) {
+      deliveryEndAt = defaults.deliveryEndAt || new Date(new Date(date).getTime() + 30600000).toISOString();
+    }
   }
 
   const { data, error } = await supabase
@@ -110,6 +124,8 @@ export const createMenuSchedule = async (date: string, stallId?: string, explici
       menu_date: date,
       visible_from: visibleFrom,
       order_cutoff: orderCutoff,
+      delivery_start_at: deliveryStartAt,
+      delivery_end_at: deliveryEndAt,
       is_published: true,
     })
     .select()
@@ -123,6 +139,8 @@ export const createMenuSchedule = async (date: string, stallId?: string, explici
     menuDate: data.menu_date,
     visibleFrom: data.visible_from,
     orderCutoff: data.order_cutoff,
+    deliveryStartAt: data.delivery_start_at,
+    deliveryEndAt: data.delivery_end_at,
     isPublished: data.is_published,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
@@ -131,12 +149,14 @@ export const createMenuSchedule = async (date: string, stallId?: string, explici
 
 // ─── Menu Schedule Items ─────────────────────────────────────
 
-export const updateMenuSchedule = async (scheduleId: string, visibleFrom: string, orderCutoff: string): Promise<void> => {
+export const updateMenuSchedule = async (scheduleId: string, visibleFrom: string, orderCutoff: string, deliveryStartAt: string, deliveryEndAt: string): Promise<void> => {
   const { error } = await supabase
     .from('menu_schedules')
     .update({
       visible_from: visibleFrom,
-      order_cutoff: orderCutoff
+      order_cutoff: orderCutoff,
+      delivery_start_at: deliveryStartAt,
+      delivery_end_at: deliveryEndAt
     })
     .eq('id', scheduleId);
 
