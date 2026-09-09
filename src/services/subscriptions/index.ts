@@ -28,12 +28,13 @@ export interface SubscriberDetails extends SubscriberListItem {
   }[];
 }
 
-export const fetchSubscribersList = async (): Promise<SubscriberListItem[]> => {
+export const fetchSubscribersList = async (stallId: string): Promise<SubscriberListItem[]> => {
   const { data, error } = await supabase
     .from('subscriptions')
     .select(`
       id,
       user_id,
+      stall_id,
       plan_name,
       status,
       remaining_meals,
@@ -48,6 +49,7 @@ export const fetchSubscribersList = async (): Promise<SubscriberListItem[]> => {
         phone
       )
     `)
+    .eq('stall_id', stallId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -147,10 +149,11 @@ export const fetchSubscriberDetails = async (subscriptionId: string): Promise<Su
   };
 };
 
-export const useSubscribersList = () => {
+export const useSubscribersList = (stallId: string) => {
   return useQuery({
-    queryKey: ['subscribers_list'],
-    queryFn: fetchSubscribersList,
+    queryKey: ['subscribers_list', stallId],
+    queryFn: () => fetchSubscribersList(stallId),
+    enabled: !!stallId,
   });
 };
 

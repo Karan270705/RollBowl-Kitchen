@@ -34,9 +34,7 @@ interface OrderCardProps {
 }
 
 export const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
-  const { stallId, resolvedOperationalDate } = useOperationalContext(
-    order.stallId
-  );
+  const { stallId, resolvedOperationalDate } = useOperationalContext();
   const { mutate: updateStatus, isPending } = useUpdateOrderStatus(
     stallId,
     order.pickupDate || resolvedOperationalDate

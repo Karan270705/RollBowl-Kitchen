@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
 import { useSubscribersList } from '@/src/services/subscriptions';
 import { useSubscriptionRequests, useApproveSubscriptionPurchase, useRejectSubscriptionPurchase } from '@/src/hooks/usePayments';
+import { useCurrentStallId } from '@/src/contexts/StallContext';
 import { PaymentProofViewerModal } from '@/src/components/payments/PaymentProofViewerModal';
 import { EmptyState, Input } from '@/src/components/ui';
 import { useRouter } from 'expo-router';
@@ -29,8 +30,9 @@ const getFriendlyRequestStatus = (status: string): string => {
 export default function SubscriptionsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { data: subscribers = [], isLoading, error, refetch: refetchSubscribers } = useSubscribersList();
-  const { data: requests = [], isLoading: isLoadingRequests, error: requestsError, refetch: refetchRequests } = useSubscriptionRequests();
+  const stallId = useCurrentStallId();
+  const { data: subscribers = [], isLoading, error, refetch: refetchSubscribers } = useSubscribersList(stallId);
+  const { data: requests = [], isLoading: isLoadingRequests, error: requestsError, refetch: refetchRequests } = useSubscriptionRequests(stallId);
 
   const approveSubMutation = useApproveSubscriptionPurchase();
   const rejectSubMutation = useRejectSubscriptionPurchase();

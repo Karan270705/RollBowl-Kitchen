@@ -11,7 +11,7 @@ import { Card } from '@/src/components/ui/Card';
 import { Input } from '@/src/components/ui/Input';
 import { getKitchenDate, formatDisplayDate, formatDateKey } from '@/src/utils/helpers';
 import { useCreateDraftBatch } from '@/src/hooks/useInventory';
-import { getPrimaryStallId } from '@/src/services/menu';
+
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { fetchPublishedMenuMeals, formatLocalDate } from '@/src/services/inventory';
 import { enableMeal, removeMealFromMenu } from '@/src/services/menu';
@@ -21,8 +21,7 @@ export default function CreateBatchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   
-  const [stallId, setStallId] = useState<string>();
-  const { resolvedOperationalDate, preparationDate, calendarDate, isResolving } = useOperationalContext(stallId);
+  const { resolvedOperationalDate, preparationDate, calendarDate, isResolving, stallId } = useOperationalContext();
   const targetDateStr = resolvedOperationalDate || preparationDate || calendarDate;
   const [date, setDate] = useState<Date | null>(null);
   
@@ -58,12 +57,7 @@ export default function CreateBatchScreen() {
 
   const { mutateAsync: createDraft, isPending } = useCreateDraftBatch();
 
-  useEffect(() => {
-    getPrimaryStallId().then(id => {
-      setStallId(id);
-    }).catch(console.error);
-  }, []);
-
+  // Removed getPrimaryStallId since stallId comes from context
   useEffect(() => {
     if (stallId && date) {
       fetchMeals(stallId, date);

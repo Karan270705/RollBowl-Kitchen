@@ -12,8 +12,8 @@ import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 export default function OperationalReservationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { preparationDate, isResolving } = useOperationalContext();
-  const { data, isPending, isLoading, error } = useOperationalReservationsDetailed(preparationDate, isResolving);
+  const { preparationDate, isResolving, stallId } = useOperationalContext();
+  const { data, isPending, isLoading, error } = useOperationalReservationsDetailed(stallId, preparationDate, isResolving);
 
   const SLOT_ORDER = [
     '12:00–12:30',

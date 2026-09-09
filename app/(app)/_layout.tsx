@@ -5,7 +5,9 @@ import { Colors, Typography, Spacing } from '@/src/constants/theme';
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { useDashboardRealtime } from '@/src/hooks/useDashboardRealtime';
 
-export default function AppLayout() {
+import { StallContextProvider } from '@/src/contexts/StallContext';
+
+function AppLayoutContent() {
   const { stallId, resolvedOperationalDate } = useOperationalContext();
   useDashboardRealtime(stallId, resolvedOperationalDate);
 
@@ -85,5 +87,13 @@ export default function AppLayout() {
         }}
       />
     </Tabs>
+  );
+}
+
+export default function AppLayout() {
+  return (
+    <StallContextProvider>
+      <AppLayoutContent />
+    </StallContextProvider>
   );
 }

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { supabase } from '@/src/lib/supabase';
-import { getPrimaryStallId } from '@/src/services/menu';
+import { useCurrentStallId } from '@/src/contexts/StallContext';
 
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
 import { Button } from '@/src/components/ui/Button';
@@ -42,7 +42,8 @@ export default function InventoryBatchDetailScreen() {
   const { mutateAsync: removeDraftItem } = useRemoveDraftItem();
   const { mutateAsync: addDraftItem } = useAddDraftItem();
 
-  const [stallId, setStallId] = useState<string>();
+  const currentStallId = useCurrentStallId();
+  const [stallId, setStallId] = useState<string>(currentStallId);
   const [scheduleId, setScheduleId] = useState<string | undefined>();
   const [availableMeals, setAvailableMeals] = useState<any[]>([]);
   const [isMealsLoading, setIsMealsLoading] = useState(false);
@@ -66,13 +67,11 @@ export default function InventoryBatchDetailScreen() {
   const [showAddMealSelector, setShowAddMealSelector] = useState(false);
 
   useEffect(() => {
-    getPrimaryStallId().then(sid => {
-      setStallId(sid);
-      if (batch?.status === 'draft' || batch?.status === 'active') {
-        fetchMeals(sid);
-      }
-    });
-  }, [batch?.status]);
+    setStallId(currentStallId);
+    if (batch?.status === 'draft' || batch?.status === 'active') {
+      fetchMeals(currentStallId);
+    }
+  }, [batch?.status, currentStallId]);
 
   useEffect(() => {
     if (batch && batch.status === 'draft') {

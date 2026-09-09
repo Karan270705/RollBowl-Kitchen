@@ -3,30 +3,18 @@ import { Order, OrderItem } from '@/src/types/models';
 import { AppError } from '@/src/utils/errors';
 import { getDeviceId } from '@/src/utils/device';
 
-export const getPrimaryStallId = async (): Promise<string> => {
-  const { data, error } = await supabase
-    .from('stalls')
-    .select('id')
-    .eq('is_active', true)
-    .limit(1)
-    .single();
 
-  if (error || !data) {
-    throw new Error('No active stall found.');
-  }
-  return data.id;
-};
 
 export interface FetchOrdersOptions {
+  stallId: string; // REQUIRED: Use StallContext to get currentStallId
   date?: string; // e.g. formatDateKey(today)
   includeFuture?: boolean; // if true, ignores date and fetches >= today
   includeCancelled?: boolean;
   statusIn?: Order['status'][];
-  stallId?: string;
 }
 
 export const fetchOrders = async (options: FetchOrdersOptions): Promise<Order[]> => {
-  const actualStallId = options.stallId || await getPrimaryStallId();
+  const actualStallId = options.stallId;
   
   let query = supabase
     .from('orders')

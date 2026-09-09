@@ -7,22 +7,17 @@ import {
   DEFAULT_RESOLVING_CONTEXT,
 } from '../utils/operationalDate';
 import { invalidateCanonicalOperationalQueries } from '../constants/queryKeys';
+import { useCurrentStallId } from '../contexts/StallContext';
 
-export function useOperationalContext(stallId?: string): OperationalContextResult & { stallId?: string; refetch: () => void } {
+export function useOperationalContext(): OperationalContextResult & { stallId: string; refetch: () => void } {
+  const stallId = useCurrentStallId(); // Get stallId from context
   const queryClient = useQueryClient();
   const rolloverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data, refetch } = useQuery({
     queryKey: ['operational-context', stallId],
-    queryFn: async () => {
-      let actualStallId = stallId;
-      if (!actualStallId) {
-        const { getPrimaryStallId } = await import('../services/menu');
-        actualStallId = await getPrimaryStallId();
-      }
-      return resolveSharedOperationalDate(actualStallId);
-    },
-    enabled: true,
+    queryFn: () => resolveSharedOperationalDate(stallId),
+    enabled: !!stallId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     retry: 2,
   });
@@ -107,7 +102,7 @@ export function useOperationalContext(stallId?: string): OperationalContextResul
 
   return {
     ...(data ?? DEFAULT_RESOLVING_CONTEXT),
-    stallId: data?.stallId || stallId,
+    stallId: stallId,
     refetch: () => {
       refetchRef.current?.();
       scheduleNextBoundary();

@@ -6,12 +6,14 @@ import {
   buildOrdersSheetData,
   ExportProgress
 } from '../services/reports/orderExport';
-import { getPrimaryStallId } from '../services/orders';
 import { buildCsvString } from '../utils/export/csv';
 import { cleanupOldExportFiles } from '../utils/export/fileCleanup';
 import * as FileSystem from 'expo-file-system/legacy';
 
+import { useCurrentStallId } from '../contexts/StallContext';
+
 export const useExportOrders = () => {
+  const stallId = useCurrentStallId();
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState<ExportProgress | null>(null);
 
@@ -26,8 +28,7 @@ export const useExportOrders = () => {
       await cleanupOldExportFiles();
       
       // Stall resolution
-      const stallId = await getPrimaryStallId();
-
+      if (!stallId) throw new Error('No active stall context');
       // Fetch
       const dataset = await fetchOrdersForExport(stallId, fromDate, toDate, setProgress);
       

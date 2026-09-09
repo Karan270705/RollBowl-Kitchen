@@ -89,7 +89,12 @@ export const useSubscriptionRequests = (stallId?: string) => {
         .channel(channelName)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'subscription_purchase_requests' },
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'subscription_purchase_requests',
+            ...(stallId ? { filter: `stall_id=eq.${stallId}` } : {})
+          },
           () => {
             void queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.subRequests() });
             void queryClient.invalidateQueries({ queryKey: ['subscribers_list'] });
@@ -97,7 +102,12 @@ export const useSubscriptionRequests = (stallId?: string) => {
         )
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'payment_proofs' },
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'payment_proofs',
+            ...(stallId ? { filter: `stall_id=eq.${stallId}` } : {})
+          },
           () => {
             void queryClient.invalidateQueries({ queryKey: PAYMENT_KEYS.subRequests() });
           }
@@ -114,8 +124,9 @@ export const useSubscriptionRequests = (stallId?: string) => {
 
   return useQuery({
     queryKey: PAYMENT_KEYS.subRequests(stallId),
-    queryFn: () => fetchSubscriptionPurchaseRequests(stallId),
+    queryFn: () => fetchSubscriptionPurchaseRequests(stallId!),
     refetchInterval: 15000, // Poll every 15s for new pending payments
+    enabled: !!stallId,
   });
 };
 

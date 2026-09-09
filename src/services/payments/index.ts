@@ -1,5 +1,4 @@
 import { supabase } from '@/src/lib/supabase';
-import { getPrimaryStallId } from '@/src/services/orders';
 
 export interface PaymentProof {
   id: string;
@@ -183,9 +182,7 @@ export const rejectOrderPayment = async (proofId: string, reason: string): Promi
   if (error) throw error;
 };
 
-export const fetchSubscriptionPurchaseRequests = async (stallId?: string): Promise<SubscriptionPurchaseRequest[]> => {
-  const actualStallId = stallId || await getPrimaryStallId();
-  
+export const fetchSubscriptionPurchaseRequests = async (stallId: string): Promise<SubscriptionPurchaseRequest[]> => {
   const explicitSelect = `
     id,
     user_id,
@@ -222,7 +219,7 @@ export const fetchSubscriptionPurchaseRequests = async (stallId?: string): Promi
   const { data, error } = await supabase
     .from('subscription_purchase_requests')
     .select(explicitSelect)
-    .eq('stall_id', actualStallId)
+    .eq('stall_id', stallId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;

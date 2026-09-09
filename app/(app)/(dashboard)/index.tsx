@@ -4,13 +4,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
 import { useUser } from '@/src/store';
-import {
-  formatDisplayDate,
-} from '@/src/utils/helpers';
+import { formatDisplayDate } from '@/src/utils/helpers';
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { useOperationalMenuStatus } from '@/src/hooks/useMenu';
 import { useDashboardMetrics } from '@/src/services/dashboard';
 import { EmptyState } from '@/src/components/ui';
+import { StallSelector } from '@/src/components/stall/StallSelector';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { getDeviceId } from '@/src/utils/device';
 
@@ -22,7 +21,7 @@ export default function DashboardScreen() {
   const { stallId, calendarDate, resolvedOperationalDate, preparationDate, isResolving } = useOperationalContext();
 
   const { data: menuStatus } = useOperationalMenuStatus(preparationDate, isResolving);
-  const { data: metrics, isPending, isLoading, error, refetch } = useDashboardMetrics(calendarDate, resolvedOperationalDate, preparationDate, isResolving, stallId);
+  const { data: metrics, isPending, isLoading, error, refetch } = useDashboardMetrics(stallId, calendarDate, resolvedOperationalDate, preparationDate, isResolving);
 
   useFocusEffect(
     useCallback(() => {
@@ -242,8 +241,10 @@ export default function DashboardScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>{greeting}</Text>
-          <Text style={styles.userName}>{user?.name || 'Staff'}</Text>
+          <Text style={styles.greeting}>{greeting} {user?.name}</Text>
+          <View style={{ marginTop: 4 }}>
+            <StallSelector />
+          </View>
         </View>
         <View style={styles.headerRight}>
           <View style={styles.dateChip}>

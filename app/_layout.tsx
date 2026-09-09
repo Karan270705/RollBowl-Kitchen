@@ -60,25 +60,25 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            animation: 'slide_from_right',
-            contentStyle: { backgroundColor: Colors.background },
-          }}
-        >
-          <Stack.Screen name="index" />
-          <Stack.Screen
-            name="(auth)"
-            options={{ animation: 'slide_from_bottom' }}
-          />
-          <Stack.Screen name="(app)" />
-          <Stack.Screen
-            name="access-denied"
-            options={{ animation: 'fade' }}
-          />
-        </Stack>
+          <StatusBar style="light" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              contentStyle: { backgroundColor: Colors.background },
+            }}
+          >
+            <Stack.Screen name="index" />
+            <Stack.Screen
+              name="(auth)"
+              options={{ animation: 'slide_from_bottom' }}
+            />
+            <Stack.Screen name="(app)" />
+            <Stack.Screen
+              name="access-denied"
+              options={{ animation: 'fade' }}
+            />
+          </Stack>
       </SessionProvider>
     </QueryClientProvider>
   );

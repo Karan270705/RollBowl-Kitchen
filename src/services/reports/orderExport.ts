@@ -92,24 +92,31 @@ export const fetchOrdersForExport = async (
 
   onProgress?.({ stage: 'Fetching walk-in sales from inventory movements...' });
 
-  const { data: invMovementsData } = await supabase
-    .from('inventory_movements')
-    .select('*')
-    .eq('movement_type', 'walk_in_sale')
+  // 1. Fetch batches for this stall in the date range
+  const { data: batchesData } = await supabase
+    .from('inventory_batches')
+    .select('id, stall_id, inventory_date, window_start, window_end, status')
+    .eq('stall_id', stallId)
     .gte('created_at', `${fromDate}T00:00:00.000Z`)
     .lte('created_at', `${toDate}T23:59:59.999Z`);
-  const walkInMovements = invMovementsData || [];
-
-  const batchIds = [...new Set(walkInMovements.map(m => m.inventory_batch_id).filter(Boolean))];
+    
   const inventoryBatches: Record<string, any> = {};
+  const batchIds = (batchesData || []).map(b => b.id);
+  
+  if (batchesData) {
+    batchesData.forEach(b => { inventoryBatches[b.id] = b; });
+  }
+
+  let walkInMovements: any[] = [];
   if (batchIds.length > 0) {
-    const { data: batchesData } = await supabase
-      .from('inventory_batches')
-      .select('id, stall_id, inventory_date, window_start, window_end, status')
-      .in('id', batchIds);
-    if (batchesData) {
-      batchesData.forEach(b => { inventoryBatches[b.id] = b; });
-    }
+    // 2. Fetch walk-in movements for these batches
+    const { data: invMovementsData } = await supabase
+      .from('inventory_movements')
+      .select('*')
+      .eq('movement_type', 'walk_in_sale')
+      .in('inventory_batch_id', batchIds);
+      
+    walkInMovements = invMovementsData || [];
   }
 
   onProgress?.({ stage: 'Fetching active subscriptions...' });
@@ -118,6 +125,7 @@ export const fetchOrdersForExport = async (
   const { data: subsData } = await supabase
     .from('subscriptions')
     .select('id, user_id, plan_name, total_meals, meals_per_day, remaining_meals, consumed_meals, purchase_price, currency, start_date, end_date, status, created_at')
+    .eq('stall_id', stallId)
     .eq('status', 'active')
     .lte('start_date', getTodayISTDateString())
     .gte('end_date', getTodayISTDateString());

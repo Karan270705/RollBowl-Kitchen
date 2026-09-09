@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/src/lib/supabase';
-import { 
-  fetchInventoryBatches, 
-  fetchInventoryBatch, 
-  fetchInventoryBatchItems, 
+import {
+  fetchInventoryBatches,
+  fetchInventoryBatch,
+  fetchInventoryBatchItems,
   fetchLiveInventoryStatus,
   createDraftInventoryBatch,
   updateDraftBatch,
@@ -18,15 +18,16 @@ import {
   formatLocalDate,
   LiveInventoryStatus
 } from '@/src/services/inventory';
-import { getPrimaryStallId } from '@/src/services/menu';
+import { useCurrentStallId } from '@/src/contexts/StallContext';
 
-export const useInventoryBatches = (stallId: string | undefined, date: string) => {
+export const useInventoryBatches = (date: string) => {
+  const stallId = useCurrentStallId();
   const queryClient = useQueryClient();
   const debounceRef = useRef<any>(null);
 
   const query = useQuery({
     queryKey: ['inventory-batches', stallId, date],
-    queryFn: () => fetchInventoryBatches(date, stallId),
+    queryFn: () => fetchInventoryBatches(stallId, date),
     enabled: !!stallId && !!date,
   });
 
@@ -212,6 +213,7 @@ export const useInventoryBatchItems = (batchId: string | undefined) => {
 };
 
 export const useLiveInventoryStatus = (batchId: string | undefined) => {
+  const stallId = useCurrentStallId();
   const queryClient = useQueryClient();
   const debounceRef = useRef<any>(null);
 
@@ -257,7 +259,7 @@ export const useLiveInventoryStatus = (batchId: string | undefined) => {
 
     channel.on(
       'postgres_changes',
-      { event: '*', schema: 'public', table: 'orders' },
+      { event: '*', schema: 'public', table: 'orders', filter: `stall_id=eq.${stallId}` },
       scheduleInvalidation
     );
 
@@ -295,20 +297,21 @@ interface CreateDraftPayload {
 }
 
 export const useCreateDraftBatch = () => {
+  const stallId = useCurrentStallId();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (payload: CreateDraftPayload) =>
       createDraftInventoryBatch(
+        stallId,
         payload.deliveryStart,
         payload.deliveryEnd,
         payload.items,
-        payload.stallId,
         payload.scheduleId,
         payload.notes
       ),
     onSuccess: (batchId, vars) => {
-      queryClient.invalidateQueries({ queryKey: ['inventory-batches', vars.stallId, formatLocalDate(vars.deliveryStart)] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-batches', stallId, formatLocalDate(vars.deliveryStart)] });
     }
   });
 };

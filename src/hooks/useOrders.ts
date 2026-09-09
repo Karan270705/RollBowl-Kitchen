@@ -10,7 +10,7 @@ import { Alert } from 'react-native';
 export const useOrders = (stallId: string | undefined, operationsDate: string | undefined | null) => {
   return useQuery({
     queryKey: stallId && operationsDate ? ordersKeys.list(stallId, operationsDate) : ['orders', 'skip'],
-    queryFn: () => fetchOrders({ stallId, date: operationsDate || undefined, includeCancelled: false }),
+    queryFn: () => fetchOrders({ stallId: stallId!, date: operationsDate || undefined, includeCancelled: false }),
     enabled: !!stallId && !!operationsDate,
   });
 };

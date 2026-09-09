@@ -4,31 +4,16 @@ import { AppConfig } from '@/src/constants/config';
 import { getKitchenDate, getKitchenTomorrow } from '@/src/utils/helpers';
 import { generateMenuScheduleTimestamps } from '@/src/utils/operationalDate';
 
-// Helper to get the primary stall for the single-stall operation
-export const getPrimaryStallId = async (): Promise<string> => {
-  const { data, error } = await supabase
-    .from('stalls')
-    .select('id')
-    .eq('is_active', true)
-    .limit(1)
-    .single();
 
-  if (error || !data) {
-    throw new Error('No active stall found.');
-  }
-  return data.id;
-};
 
 // ─── Menu Schedules ──────────────────────────────────────────
 
-export const getMenuForDate = async (date: string, stallId?: string): Promise<{ schedule: MenuSchedule | null, items: MenuScheduleItem[] }> => {
-  const actualStallId = stallId || await getPrimaryStallId();
-
+export const getMenuForDate = async (stallId: string, date: string): Promise<{ schedule: MenuSchedule | null, items: MenuScheduleItem[] }> => {
   // 1. Fetch the schedule
   const { data: scheduleData, error: scheduleError } = await supabase
     .from('menu_schedules')
     .select('*')
-    .eq('stall_id', actualStallId)
+    .eq('stall_id', stallId)
     .eq('menu_date', date)
     .maybeSingle();
 
@@ -92,20 +77,18 @@ export const getMenuForDate = async (date: string, stallId?: string): Promise<{ 
   return { schedule, items };
 };
 
-export const createMenuSchedule = async (date: string, stallId?: string, explicitVisibleFrom?: string, explicitOrderCutoff?: string, explicitDeliveryStart?: string, explicitDeliveryEnd?: string): Promise<MenuSchedule> => {
-  const actualStallId = stallId || await getPrimaryStallId();
-  
+export const createMenuSchedule = async (stallId: string, date: string, explicitVisibleFrom?: string, explicitOrderCutoff?: string, explicitDeliveryStart?: string, explicitDeliveryEnd?: string): Promise<MenuSchedule> => {
   // Use explicit timestamps if provided, otherwise fallback to defaults
   let visibleFrom = explicitVisibleFrom;
   let orderCutoff = explicitOrderCutoff;
   let deliveryStartAt = explicitDeliveryStart;
   let deliveryEndAt = explicitDeliveryEnd;
-  
+
   if (!visibleFrom || !orderCutoff || !deliveryStartAt || !deliveryEndAt) {
     const defaults = generateMenuScheduleTimestamps(date) as any;
     if (!visibleFrom) visibleFrom = defaults.visibleFrom;
     if (!orderCutoff) orderCutoff = defaults.orderCutoff;
-    
+
     // Robust fallbacks in case Metro bundler cached the old operationalDate.ts logic
     // 12:00 PM IST = 06:30 AM UTC = 23400000 ms
     // 14:00 PM IST = 08:30 AM UTC = 30600000 ms
@@ -120,7 +103,7 @@ export const createMenuSchedule = async (date: string, stallId?: string, explici
   const { data, error } = await supabase
     .from('menu_schedules')
     .insert({
-      stall_id: actualStallId,
+      stall_id: stallId,
       menu_date: date,
       visible_from: visibleFrom,
       order_cutoff: orderCutoff,
@@ -203,13 +186,11 @@ export const removeMealFromMenu = async (scheduleId: string, mealId: string): Pr
 
 // ─── Utilities ───────────────────────────────────────────────
 
-export const getAllMeals = async (stallId?: string): Promise<Meal[]> => {
-  const actualStallId = stallId || await getPrimaryStallId();
-  
+export const getAllMeals = async (stallId: string): Promise<Meal[]> => {
   const { data, error } = await supabase
     .from('meals')
     .select('*')
-    .eq('stall_id', actualStallId)
+    .eq('stall_id', stallId)
     .order('name');
 
   if (error) throw error;
@@ -242,19 +223,17 @@ export const enableMeal = async (mealId: string): Promise<void> => {
   if (error) throw error;
 };
 
-export const copyMenu = async (fromDate: string, toDate: string, stallId?: string): Promise<void> => {
-  const actualStallId = stallId || await getPrimaryStallId();
-  
+export const copyMenu = async (stallId: string, fromDate: string, toDate: string): Promise<void> => {
   // 1. Get source menu
-  const { schedule: sourceSchedule, items: sourceItems } = await getMenuForDate(fromDate, actualStallId);
+  const { schedule: sourceSchedule, items: sourceItems } = await getMenuForDate(stallId, fromDate);
   if (!sourceSchedule || sourceItems.length === 0) {
     throw new Error('No menu found for source date.');
   }
 
   // 2. Ensure target schedule exists
-  let { schedule: targetSchedule } = await getMenuForDate(toDate, actualStallId);
+  let { schedule: targetSchedule } = await getMenuForDate(stallId, toDate);
   if (!targetSchedule) {
-    targetSchedule = await createMenuSchedule(toDate, actualStallId);
+    targetSchedule = await createMenuSchedule(stallId, toDate);
   }
 
   // 3. Copy items
@@ -262,11 +241,11 @@ export const copyMenu = async (fromDate: string, toDate: string, stallId?: strin
   await saveMenuMeals(targetSchedule.id, mealIds);
 };
 
-export const getOperationalMenuStatus = async (resolvedOperationalDate: string): Promise<{ isConfigured: boolean; itemCount: number }> => {
+export const getOperationalMenuStatus = async (stallId: string, resolvedOperationalDate: string): Promise<{ isConfigured: boolean; itemCount: number }> => {
   try {
     const dateStr = resolvedOperationalDate;
-    const { schedule, items } = await getMenuForDate(dateStr);
-    
+    const { schedule, items } = await getMenuForDate(stallId, dateStr);
+
     return {
       isConfigured: !!schedule && items.length > 0,
       itemCount: items.length,

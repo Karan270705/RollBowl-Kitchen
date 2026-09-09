@@ -1,14 +1,12 @@
 import { supabase } from '@/src/lib/supabase';
 import { KitchenHoliday } from '@/src/types/models';
-import { getPrimaryStallId } from '@/src/services/menu';
 
-export const fetchHolidays = async (stallId?: string): Promise<KitchenHoliday[]> => {
-  const actualStallId = stallId || await getPrimaryStallId();
 
+export const fetchHolidays = async (stallId: string): Promise<KitchenHoliday[]> => {
   const { data, error } = await supabase
     .from('kitchen_holidays')
     .select('*')
-    .eq('stall_id', actualStallId)
+    .eq('stall_id', stallId)
     .order('holiday_date', { ascending: false });
 
   if (error) throw error;
@@ -26,14 +24,12 @@ export const fetchHolidays = async (stallId?: string): Promise<KitchenHoliday[]>
   }));
 };
 
-export const addHoliday = async (params: { holidayDate: string; title: string; description?: string; stallId?: string }): Promise<void> => {
-  const actualStallId = params.stallId || await getPrimaryStallId();
-
+export const addHoliday = async (params: { stallId: string; holidayDate: string; title: string; description?: string }): Promise<void> => {
   // 1. Check if a disabled holiday already exists for this date (handles re-adding after disable)
   const { data: existing, error: checkError } = await supabase
     .from('kitchen_holidays')
     .select('id, is_active')
-    .eq('stall_id', actualStallId)
+    .eq('stall_id', params.stallId)
     .eq('holiday_date', params.holidayDate)
     .maybeSingle();
 
@@ -61,7 +57,7 @@ export const addHoliday = async (params: { holidayDate: string; title: string; d
     const { error: insertError } = await supabase
       .from('kitchen_holidays')
       .insert({
-        stall_id: actualStallId,
+        stall_id: params.stallId,
         holiday_date: params.holidayDate,
         title: params.title,
         description: params.description,
@@ -72,7 +68,7 @@ export const addHoliday = async (params: { holidayDate: string; title: string; d
 
   // 2. Extend Affected Subscriptions via Database RPC
   const { error: rpcError } = await supabase.rpc('recalculate_overlapping_subscriptions', {
-    p_stall_id: actualStallId,
+    p_stall_id: params.stallId,
     p_holiday_date: params.holidayDate
   });
   if (rpcError) throw rpcError;
@@ -114,13 +110,11 @@ export const updateHolidayStatus = async (holidayId: string, isActive: boolean):
   if (rpcError) throw rpcError;
 };
 
-export const getHolidayForDate = async (date: string, stallId?: string): Promise<KitchenHoliday | null> => {
-  const actualStallId = stallId || await getPrimaryStallId();
-
+export const getHolidayForDate = async (date: string, stallId: string): Promise<KitchenHoliday | null> => {
   const { data, error } = await supabase
     .from('kitchen_holidays')
     .select('*')
-    .eq('stall_id', actualStallId)
+    .eq('stall_id', stallId)
     .eq('holiday_date', date)
     .eq('is_active', true)
     .limit(1);

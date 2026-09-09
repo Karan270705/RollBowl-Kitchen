@@ -10,7 +10,7 @@ import { Card } from '@/src/components/ui/Card';
 import { Button } from '@/src/components/ui/Button';
 import { getKitchenDate, formatDateKey, formatDisplayDate, formatTimeSlot, isBatchExpired } from '@/src/utils/helpers';
 import { useInventoryBatches, useLiveInventoryStatus, useInventoryBatchItems, useActivateBatch, useCancelBatch, useCloseBatch } from '@/src/hooks/useInventory';
-import { getPrimaryStallId } from '@/src/services/menu';
+
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 
 const BatchCard = ({ batch, onActivate, onCancel, onClose }: { batch: any, onActivate: (id: string) => void, onCancel: (id: string) => void, onClose: (id: string) => void }) => {
@@ -116,15 +116,12 @@ const BatchCard = ({ batch, onActivate, onCancel, onClose }: { batch: any, onAct
 export default function InventoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [stallId, setStallId] = useState<string>();
-  const { resolvedOperationalDate, preparationDate, calendarDate, isResolving } = useOperationalContext(stallId);
+  const { resolvedOperationalDate, preparationDate, calendarDate, isResolving, stallId } = useOperationalContext();
   const targetDateStr = resolvedOperationalDate || preparationDate || calendarDate;
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  useEffect(() => {
-    getPrimaryStallId().then(setStallId).catch(console.error);
-  }, []);
+  // Removed getPrimaryStallId since stallId comes from context
 
   useEffect(() => {
     if (!isResolving && targetDateStr && !selectedDate) {
@@ -133,7 +130,7 @@ export default function InventoryScreen() {
   }, [targetDateStr, isResolving, selectedDate]);
 
   const dateKey = selectedDate ? formatDateKey(selectedDate) : (targetDateStr || formatDateKey(new Date()));
-  const { data: batches, isLoading } = useInventoryBatches(stallId, dateKey);
+  const { data: batches, isLoading } = useInventoryBatches(dateKey);
 
   // Sort batches: Active (non-expired) > Active (expired/stale) > Upcoming (Drafts) > Historical
   const sortedBatches = React.useMemo(() => {

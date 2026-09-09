@@ -1,5 +1,5 @@
 import { supabase } from '@/src/lib/supabase';
-import { getPrimaryStallId } from '@/src/services/menu';
+
 import { useQuery } from '@tanstack/react-query';
 import { Order, KitchenHoliday } from '@/src/types/models';
 import { fetchOrders } from '@/src/services/orders';
@@ -34,36 +34,36 @@ export interface DashboardMetrics {
 }
 
 export const fetchDashboardMetrics = async (
+  stallId: string,
   calendarDate: string,
   resolvedOperationalDate: string | null,
-  preparationDate: string,
-  stallId?: string
+  preparationDate: string
 ): Promise<DashboardMetrics> => {
-  const actualStallId = stallId || await getPrimaryStallId();
   const operationsDate = resolvedOperationalDate;
 
   // 1. Fetch Execution Orders (Operations dataset), Walk-in Sales & Holidays
   const [executionOrdersList, walkInSalesList, holidayExecution, holidayOperational] = await Promise.all([
     operationsDate
       ? fetchOrders({
-          stallId: actualStallId,
+          stallId: stallId,
           date: operationsDate,
           includeCancelled: true,
         })
       : Promise.resolve([] as Order[]),
     operationsDate
-      ? fetchWalkInSales(actualStallId, operationsDate)
+      ? fetchWalkInSales(stallId, operationsDate)
       : Promise.resolve([]),
     operationsDate
-      ? getHolidayForDate(operationsDate, actualStallId)
+      ? getHolidayForDate(operationsDate, stallId)
       : Promise.resolve(null),
-    getHolidayForDate(preparationDate, actualStallId)
+    getHolidayForDate(preparationDate, stallId)
   ]);
 
-  // 2. Fetch Active Subscriptions
+  // 2. Fetch Active Subscriptions (stall-scoped)
   const { count: activeSubCount, error: subError } = await supabase
     .from('subscriptions')
     .select('*', { count: 'exact', head: true })
+    .eq('stall_id', stallId)
     .eq('status', 'active')
     .lte('start_date', getTodayISTDateString())
     .gte('end_date', getTodayISTDateString());
@@ -72,7 +72,7 @@ export const fetchDashboardMetrics = async (
 
   // 3. Operational Reservations (bound to preparationDate)
   const operationalOrders = await fetchOrders({
-    stallId: actualStallId,
+    stallId: stallId,
     date: preparationDate,
     includeCancelled: false,
     statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
@@ -191,16 +191,16 @@ export const fetchDashboardMetrics = async (
 };
 
 export const useDashboardMetrics = (
+  stallId: string,
   calendarDate: string,
   resolvedOperationalDate: string | null,
   preparationDate: string,
-  isResolving: boolean,
-  stallId?: string
+  isResolving: boolean
 ) => {
   return useQuery({
-    queryKey: dashboardKeys.summary(stallId || 'default', resolvedOperationalDate),
-    queryFn: () => fetchDashboardMetrics(calendarDate, resolvedOperationalDate, preparationDate, stallId),
-    enabled: !isResolving,
+    queryKey: dashboardKeys.summary(stallId, resolvedOperationalDate),
+    queryFn: () => fetchDashboardMetrics(stallId, calendarDate, resolvedOperationalDate, preparationDate),
+    enabled: !isResolving && !!stallId,
     staleTime: 5000,
   });
 };
@@ -223,19 +223,17 @@ export interface OperationalReservationDetails {
 }
 
 export const fetchOperationalReservationsDetailed = async (
-  preparationDate: string,
-  stallId?: string
+  stallId: string,
+  preparationDate: string
 ): Promise<OperationalReservationDetails> => {
-  const actualStallId = stallId || await getPrimaryStallId();
-
   const [orders, holidayOperational] = await Promise.all([
     fetchOrders({
-      stallId: actualStallId,
+      stallId: stallId,
       date: preparationDate,
       includeCancelled: false,
       statusIn: ['pending', 'confirmed', 'preparing', 'ready'],
     }),
-    getHolidayForDate(preparationDate, actualStallId)
+    getHolidayForDate(preparationDate, stallId)
   ]);
 
   let totalMealsReserved = 0;
@@ -276,11 +274,11 @@ export const fetchOperationalReservationsDetailed = async (
   };
 };
 
-export const useOperationalReservationsDetailed = (preparationDate: string, isResolving: boolean, stallId?: string) => {
+export const useOperationalReservationsDetailed = (stallId: string, preparationDate: string, isResolving: boolean) => {
   return useQuery({
-    queryKey: dashboardKeys.preparation(stallId || 'default', preparationDate),
-    queryFn: () => fetchOperationalReservationsDetailed(preparationDate, stallId),
-    enabled: !isResolving && !!preparationDate,
+    queryKey: dashboardKeys.preparation(stallId, preparationDate),
+    queryFn: () => fetchOperationalReservationsDetailed(stallId, preparationDate),
+    enabled: !isResolving && !!preparationDate && !!stallId,
     staleTime: 5000,
   });
 };

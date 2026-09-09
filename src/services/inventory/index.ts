@@ -1,5 +1,5 @@
 import { supabase } from '@/src/lib/supabase';
-import { getPrimaryStallId } from '@/src/services/menu';
+
 
 export interface InventoryBatch {
   id: string;
@@ -110,12 +110,11 @@ export const parseInventoryError = (error: any): Error => {
   return new Error(message || 'An inventory error occurred.');
 };
 
-export const fetchInventoryBatches = async (date: string, stallId?: string): Promise<InventoryBatch[]> => {
-  const actualStallId = stallId || await getPrimaryStallId();
+export const fetchInventoryBatches = async (stallId: string, date: string): Promise<InventoryBatch[]> => {
   const { data, error } = await supabase
     .from('inventory_batches')
     .select('*')
-    .eq('stall_id', actualStallId)
+    .eq('stall_id', stallId)
     .eq('inventory_date', date)
     .order('window_start', { ascending: true });
 
@@ -244,15 +243,13 @@ export async function fetchPublishedMenuMeals(stallId: string, date: string): Pr
 }
 
 export const createDraftInventoryBatch = async (
+  stallId: string,
   deliveryStart: Date,
   deliveryEnd: Date,
   items: { mealId: string; loadedQuantity: number }[],
-  stallId?: string,
   scheduleId?: string,
   notes?: string
 ): Promise<string> => {
-  const actualStallId = stallId || await getPrimaryStallId();
-  
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user || !user.id) {
     throw new Error("You must be logged in to create a batch.");
@@ -276,7 +273,7 @@ export const createDraftInventoryBatch = async (
   const window_end = formatLocalTime(dEnd);
 
   console.log('[Inventory] Creating draft', {
-    stallId: actualStallId,
+    stallId: stallId,
     inventoryDate: inventory_date,
     windowStart: window_start,
     windowEnd: window_end,
@@ -288,7 +285,7 @@ export const createDraftInventoryBatch = async (
   const { data: batch, error: batchError } = await supabase
     .from('inventory_batches')
     .insert({
-      stall_id: actualStallId,
+      stall_id: stallId,
       inventory_date,
       window_start,
       window_end,
