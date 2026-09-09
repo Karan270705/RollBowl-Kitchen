@@ -8,7 +8,6 @@
     "icon": "./assets/images/kitchen-icon.png",
     "scheme": "rollbowl-kitchen",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.rollbowl.kitchen"
@@ -20,8 +19,7 @@
         "foregroundImage": "./assets/images/kitchen-adaptive-foreground.png",
         "backgroundImage": "./assets/images/kitchen-adaptive-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
-      },
-      "edgeToEdgeEnabled": true
+      }
     },
     "web": {
       "output": "static",
