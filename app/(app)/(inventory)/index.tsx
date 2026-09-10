@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+// @ts-ignore
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { Colors, Typography, Spacing, Radii } from '@/src/constants/theme';
@@ -12,6 +13,7 @@ import { getKitchenDate, formatDateKey, formatDisplayDate, formatTimeSlot, isBat
 import { useInventoryBatches, useLiveInventoryStatus, useInventoryBatchItems, useActivateBatch, useCancelBatch, useCloseBatch } from '@/src/hooks/useInventory';
 
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
+import { StallSelector } from '@/src/components/stall/StallSelector';
 
 const BatchCard = ({ batch, onActivate, onCancel, onClose }: { batch: any, onActivate: (id: string) => void, onCancel: (id: string) => void, onClose: (id: string) => void }) => {
   const router = useRouter();
@@ -27,14 +29,14 @@ const BatchCard = ({ batch, onActivate, onCancel, onClose }: { batch: any, onAct
 
   if (batch.status === 'draft') {
     itemCount = items?.length || 0;
-    loaded = items?.reduce((sum, i) => sum + i.loaded_quantity, 0) || 0;
+    loaded = items?.reduce((sum: number, i: any) => sum + i.loaded_quantity, 0) || 0;
   } else {
     itemCount = liveStatus?.length || 0;
-    loaded = liveStatus?.reduce((sum, i) => sum + i.loaded_quantity, 0) || 0;
-    reserved = liveStatus?.reduce((sum, i) => sum + i.active_reserved, 0) || 0;
-    fulfilled = liveStatus?.reduce((sum, i) => sum + i.fulfilled, 0) || 0;
-    remaining = liveStatus?.reduce((sum, i) => sum + i.remaining_physical, 0) || 0;
-    customerAvail = liveStatus?.reduce((sum, i) => sum + i.customer_available, 0) || 0;
+    loaded = liveStatus?.reduce((sum: number, i: any) => sum + i.loaded_quantity, 0) || 0;
+    reserved = liveStatus?.reduce((sum: number, i: any) => sum + i.active_reserved, 0) || 0;
+    fulfilled = liveStatus?.reduce((sum: number, i: any) => sum + i.fulfilled, 0) || 0;
+    remaining = liveStatus?.reduce((sum: number, i: any) => sum + i.remaining_physical, 0) || 0;
+    customerAvail = liveStatus?.reduce((sum: number, i: any) => sum + i.customer_available, 0) || 0;
   }
 
   const isStale = batch.status === 'active' && isBatchExpired(batch.inventory_date, batch.window_end);
@@ -154,7 +156,12 @@ export default function InventoryScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + Spacing.base }]}>
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>Inventory</Text>
+        <View>
+          <Text style={styles.screenTitle}>Inventory</Text>
+          <View style={{ marginTop: 4 }}>
+            <StallSelector />
+          </View>
+        </View>
         <TouchableOpacity 
           style={styles.dateSelector}
           onPress={() => setShowDatePicker(true)}
@@ -170,10 +177,11 @@ export default function InventoryScreen() {
           value={selectedDate}
           mode="date"
           display="default"
-          onChange={(event, date) => {
+          onValueChange={(date?: Date) => {
             setShowDatePicker(false);
             if (date) setSelectedDate(date);
           }}
+          onDismiss={() => setShowDatePicker(false)}
         />
       )}
 

@@ -64,8 +64,8 @@ export default function ExportOrdersScreen() {
           value={value}
           mode="date"
           display="default"
-          onChange={(event, selectedDate) => {
-            if (selectedDate) onChange(event, selectedDate);
+          onValueChange={(selectedDate) => {
+            if (selectedDate) onChange(null, selectedDate);
           }}
           themeVariant="dark"
         />
@@ -76,10 +76,11 @@ export default function ExportOrdersScreen() {
         value={value}
         mode="date"
         display="default"
-        onChange={(event, selectedDate) => {
+        onValueChange={(selectedDate) => {
           setShow(false);
-          if (selectedDate) onChange(event, selectedDate);
+          if (selectedDate) onChange(null, selectedDate);
         }}
+        onDismiss={() => setShow(false)}
       />
     ) : null;
   };

@@ -488,13 +488,15 @@ export default function InventoryBatchDetailScreen() {
       {showStartPicker && (
         <DateTimePicker
           value={windowStart} mode="time" display="default"
-          onChange={(e, d) => { setShowStartPicker(false); if(d) handleUpdateWindow(d, windowEnd); }}
+          onValueChange={(d) => { setShowStartPicker(false); if(d) handleUpdateWindow(d, windowEnd); }}
+          onDismiss={() => setShowStartPicker(false)}
         />
       )}
       {showEndPicker && (
         <DateTimePicker
           value={windowEnd} mode="time" display="default"
-          onChange={(e, d) => { setShowEndPicker(false); if(d) handleUpdateWindow(windowStart, d); }}
+          onValueChange={(d) => { setShowEndPicker(false); if(d) handleUpdateWindow(windowStart, d); }}
+          onDismiss={() => setShowEndPicker(false)}
         />
       )}
 

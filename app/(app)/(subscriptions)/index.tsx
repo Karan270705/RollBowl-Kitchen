@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Typography, Spacing, Radii, Shadows } from '@/src/constants/theme';
-import { useSubscribersList } from '@/src/services/subscriptions';
+import { useSubscribersList, type SubscriberListItem } from '@/src/services/subscriptions';
 import { useSubscriptionRequests, useApproveSubscriptionPurchase, useRejectSubscriptionPurchase } from '@/src/hooks/usePayments';
 import { useCurrentStallId } from '@/src/contexts/StallContext';
 import { PaymentProofViewerModal } from '@/src/components/payments/PaymentProofViewerModal';
@@ -55,14 +55,14 @@ export default function SubscriptionsScreen() {
     };
   }, [refetchSubscribers]);
 
-  const activeCount = subscribers.filter(s => s.status === 'active').length;
-  const expiredCount = subscribers.filter(s => s.status === 'expired').length;
-  const totalCredits = subscribers
-    .filter(s => s.status === 'active')
-    .reduce((sum, s) => sum + s.remainingMeals, 0);
+  const activeCount = (subscribers as SubscriberListItem[]).filter((s) => s.status === 'active').length;
+  const expiredCount = (subscribers as SubscriberListItem[]).filter((s) => s.status === 'expired').length;
+  const totalCredits = (subscribers as SubscriberListItem[])
+    .filter((s) => s.status === 'active')
+    .reduce((sum: number, s) => sum + s.remainingMeals, 0);
 
-  const expiringSoonCount = subscribers.filter(s => isExpiringSoon(s.endDate) && s.status === 'active').length;
-  const pendingRequestsCount = requests.filter(r => r.status === 'verification_pending' || r.status === 'awaiting_proof').length;
+  const expiringSoonCount = (subscribers as SubscriberListItem[]).filter((s) => isExpiringSoon(s.endDate) && s.status === 'active').length;
+  const pendingRequestsCount = requests.filter((r: any) => r.status === 'verification_pending' || r.status === 'awaiting_proof').length;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -409,6 +409,14 @@ export default function SubscriptionsScreen() {
                       {sub.customerName === 'No Profile Name' && (
                         <Text style={styles.userIdText}>ID: {sub.userId}</Text>
                       )}
+                      {sub.stallName ? (
+                        <View style={styles.stallInfoRow}>
+                          <Ionicons name="business-outline" size={13} color={Colors.textTertiary} />
+                          <Text style={styles.stallInfoText}>
+                            {sub.stallName}{sub.stallLocation ? ` • ${sub.stallLocation}` : ''}
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
                     <View style={[styles.statusBadge, { backgroundColor: getStatusColor(sub.status) + '15', borderColor: getStatusColor(sub.status) + '40' }]}>
                       <Text style={[styles.statusText, { color: getStatusColor(sub.status) }]}>{sub.status.toUpperCase()}</Text>
@@ -684,6 +692,17 @@ const styles = StyleSheet.create({
     fontFamily: Typography.family.regular,
     color: Colors.textTertiary,
     marginTop: 2,
+  },
+  stallInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 3,
+  },
+  stallInfoText: {
+    fontSize: Typography.size.xs,
+    fontFamily: Typography.family.medium,
+    color: Colors.textTertiary,
   },
   statusBadge: {
     paddingHorizontal: Spacing.sm,

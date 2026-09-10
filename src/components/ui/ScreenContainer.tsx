@@ -39,6 +39,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
       style={styles.safeArea}
       edges={safeAreaEdges}
     >
+      {/* @ts-ignore: backgroundColor exists on Android but types might be missing */}
       <StatusBar style="light" backgroundColor={Colors.background} />
       {scrollable ? (
         <ScrollView

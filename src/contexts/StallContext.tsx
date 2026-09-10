@@ -7,6 +7,7 @@ import * as SecureStore from 'expo-secure-store';
 export interface Stall {
   id: string;
   name: string;
+  location?: string;
   is_active: boolean;
 }
 
@@ -61,26 +62,35 @@ export const StallContextProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setAuthUserId(user.id);
       }
 
-      console.log('[StallContext] Fetching assignments for user:', user.id);
+      console.log('[StallContext] Fetching all active stalls');
 
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('staff_assignments')
-        .select('*, stalls(id, name, is_active)')
-        .eq('user_id', user.id);
+      const { data: stallsData, error: stallsError } = await supabase
+        .from('stalls')
+        .select('id, name, location, is_active')
+        .eq('is_active', true)
+        .order('name');
 
-      if (assignmentsError) {
-        throw new Error(`Failed to fetch staff assignments: ${assignmentsError.message}`);
+      if (stallsError) {
+        throw new Error(`Failed to fetch stalls: ${stallsError.message}`);
       }
 
-      const validAssignments = (assignmentsData || [])
-        .filter(a => a.stalls && a.stalls.is_active)
-        .sort((a, b) => a.stalls!.name.localeCompare(b.stalls!.name));
-
-      console.log('[StallContext] Found valid assignments:', validAssignments.length);
-
-      if (validAssignments.length === 0) {
-        throw new Error('You are not assigned to any active stall. Contact your administrator.');
+      if (!stallsData || stallsData.length === 0) {
+        setError('No active stalls found. Please contact administrator.');
+        setIsLoading(false);
+        return;
       }
+
+      // Convert to assignment-like structure for full backward compatibility
+      const validAssignments: StaffAssignment[] = stallsData.map(stall => ({
+        id: stall.id,
+        user_id: user.id,
+        stall_id: stall.id,
+        role: 'kitchen',
+        created_at: new Date().toISOString(),
+        stalls: stall,
+      }));
+
+      console.log('[StallContext] Found active stalls:', validAssignments.length);
 
       setAssignments(validAssignments);
 
@@ -138,7 +148,7 @@ export const StallContextProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const switchStall = async (stallId: string) => {
     const assignment = assignments.find(a => a.stall_id === stallId);
     if (!assignment) {
-      throw new Error('You are not authorized for this stall.');
+      throw new Error('Stall not found.');
     }
     if (!assignment.stalls?.is_active) {
       throw new Error('This stall is inactive.');

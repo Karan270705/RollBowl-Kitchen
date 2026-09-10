@@ -19,6 +19,7 @@ import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { HistoryEntry } from '@/src/types/models';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
+import { StallSelector } from '@/src/components/stall/StallSelector';
 
 type SectionFilter = 'active' | 'completed';
 type TypeFilter = 'all' | 'direct' | 'subscription' | 'walk_in';
@@ -160,7 +161,12 @@ export default function OrdersScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Orders</Text>
+        <View>
+          <Text style={styles.headerTitle}>Orders</Text>
+          <View style={{ marginTop: 4 }}>
+            <StallSelector />
+          </View>
+        </View>
         {resolvedOperationalDate ? (
           <View style={styles.dateBadge}>
             <Ionicons

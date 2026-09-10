@@ -21,6 +21,7 @@ import { generateMenuScheduleTimestamps } from '@/src/utils/operationalDate';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useHolidayForDate } from '@/src/hooks/useHolidays';
 import { Ionicons } from '@expo/vector-icons';
+import { StallSelector } from '@/src/components/stall/StallSelector';
 
 export default function MenuScreen() {
   const insets = useSafeAreaInsets();
@@ -100,12 +101,12 @@ export default function MenuScreen() {
     }
   };
   
-  const currentItemIds = items.map((i) => i.mealId);
+  const currentItemIds = items.map((i: any) => i.mealId);
 
   const handleSaveMeals = async (mealIds: string[]) => {
-    const unavailableSelected = mealsPool.filter(m => mealIds.includes(m.id) && !m.isAvailable);
+    const unavailableSelected = mealsPool.filter((m: any) => mealIds.includes(m.id) && !m.isAvailable);
     if (unavailableSelected.length > 0) {
-      const names = unavailableSelected.map(m => m.name).join(', ');
+      const names = unavailableSelected.map((m: any) => m.name).join(', ');
       Alert.alert(
         'Unavailable Meals Selected',
         `${names} is currently disabled in the catalogue. Enable it before publishing.`,
@@ -186,7 +187,12 @@ export default function MenuScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Menu Planner</Text>
+        <View>
+          <Text style={styles.headerTitle}>Menu Planner</Text>
+          <View style={{ marginTop: 4 }}>
+            <StallSelector />
+          </View>
+        </View>
       </View>
 
       <CalendarStrip
@@ -338,7 +344,7 @@ export default function MenuScreen() {
               )}
             </View>
           ) : (
-            items.map((item) => (
+            items.map((item: any) => (
               <MenuItemCard
                 key={item.id}
                 item={item}
@@ -375,7 +381,7 @@ export default function MenuScreen() {
           value={orderingStart}
           mode={showStartPicker.mode}
           display="default"
-          onChange={(e, d) => {
+          onValueChange={(d?: Date) => {
             setShowStartPicker({ ...showStartPicker, visible: false });
             if (d) {
               const newDate = new Date(orderingStart);
@@ -387,6 +393,7 @@ export default function MenuScreen() {
               setOrderingStart(newDate);
             }
           }}
+          onDismiss={() => setShowStartPicker({ ...showStartPicker, visible: false })}
         />
       )}
       {showEndPicker.visible && orderingEnd && (
@@ -394,7 +401,7 @@ export default function MenuScreen() {
           value={orderingEnd}
           mode={showEndPicker.mode}
           display="default"
-          onChange={(e, d) => {
+          onValueChange={(d?: Date) => {
             setShowEndPicker({ ...showEndPicker, visible: false });
             if (d) {
               const newDate = new Date(orderingEnd);
@@ -406,6 +413,7 @@ export default function MenuScreen() {
               setOrderingEnd(newDate);
             }
           }}
+          onDismiss={() => setShowEndPicker({ ...showEndPicker, visible: false })}
         />
       )}
       {showDeliveryStartPicker.visible && deliveryStart && (
@@ -413,7 +421,7 @@ export default function MenuScreen() {
           value={deliveryStart}
           mode={showDeliveryStartPicker.mode}
           display="default"
-          onChange={(e, d) => {
+          onValueChange={(d?: Date) => {
             setShowDeliveryStartPicker({ ...showDeliveryStartPicker, visible: false });
             if (d) {
               const newDate = new Date(deliveryStart);
@@ -425,6 +433,7 @@ export default function MenuScreen() {
               setDeliveryStart(newDate);
             }
           }}
+          onDismiss={() => setShowDeliveryStartPicker({ ...showDeliveryStartPicker, visible: false })}
         />
       )}
       {showDeliveryEndPicker.visible && deliveryEnd && (
@@ -432,7 +441,7 @@ export default function MenuScreen() {
           value={deliveryEnd}
           mode={showDeliveryEndPicker.mode}
           display="default"
-          onChange={(e, d) => {
+          onValueChange={(d?: Date) => {
             setShowDeliveryEndPicker({ ...showDeliveryEndPicker, visible: false });
             if (d) {
               const newDate = new Date(deliveryEnd);
@@ -444,6 +453,7 @@ export default function MenuScreen() {
               setDeliveryEnd(newDate);
             }
           }}
+          onDismiss={() => setShowDeliveryEndPicker({ ...showDeliveryEndPicker, visible: false })}
         />
       )}
     </View>

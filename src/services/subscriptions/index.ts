@@ -1,4 +1,5 @@
 import { supabase } from '@/src/lib/supabase';
+// @ts-ignore - module resolves at runtime; IDE language server cache issue
 import { useQuery } from '@tanstack/react-query';
 import { getTodayISTDateString } from '@/src/utils/operationalDate';
 
@@ -16,6 +17,9 @@ export interface SubscriberListItem {
   endDate: string;
   email?: string;
   phone?: string;
+  stallId?: string;
+  stallName?: string;
+  stallLocation?: string;
 }
 
 export interface SubscriberDetails extends SubscriberListItem {
@@ -47,6 +51,11 @@ export const fetchSubscribersList = async (stallId: string): Promise<SubscriberL
         name,
         email,
         phone
+      ),
+      stalls (
+        id,
+        name,
+        location
       )
     `)
     .eq('stall_id', stallId)
@@ -78,6 +87,9 @@ export const fetchSubscribersList = async (stallId: string): Promise<SubscriberL
       endDate: sub.end_date,
       email: sub.users?.email,
       phone: sub.users?.phone,
+      stallId: sub.stalls?.id,
+      stallName: sub.stalls?.name,
+      stallLocation: sub.stalls?.location,
     };
   });
 };

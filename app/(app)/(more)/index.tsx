@@ -108,6 +108,19 @@ export default function MoreScreen() {
           </View>
           <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />
         </TouchableOpacity>
+
+        <View style={styles.infoDivider} />
+
+        <TouchableOpacity 
+          style={styles.infoRow}
+          onPress={() => router.push('/(app)/(more)/stalls')}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+            <Ionicons name="business-outline" size={20} color={Colors.textPrimary} />
+            <Text style={styles.infoLabel}>Manage Stalls</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={Colors.borderLight} />
+        </TouchableOpacity>
       </Card>
 
       {/* Sign Out */}

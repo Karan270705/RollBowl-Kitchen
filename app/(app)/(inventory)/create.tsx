@@ -278,7 +278,7 @@ export default function CreateBatchScreen() {
       {showStartPicker.visible && windowStart && (
         <DateTimePicker
           value={windowStart} mode={showStartPicker.mode} display="default"
-          onChange={(e, d) => { 
+          onValueChange={(d) => { 
             setShowStartPicker({ ...showStartPicker, visible: false }); 
             if(d) { 
               const nd = new Date(windowStart); 
@@ -290,12 +290,13 @@ export default function CreateBatchScreen() {
               setWindowStart(nd); 
             } 
           }}
+          onDismiss={() => setShowStartPicker({ ...showStartPicker, visible: false })}
         />
       )}
       {showEndPicker.visible && windowEnd && (
         <DateTimePicker
           value={windowEnd} mode={showEndPicker.mode} display="default"
-          onChange={(e, d) => { 
+          onValueChange={(d) => { 
             setShowEndPicker({ ...showEndPicker, visible: false }); 
             if(d) { 
               const nd = new Date(windowEnd); 
@@ -307,6 +308,7 @@ export default function CreateBatchScreen() {
               setWindowEnd(nd); 
             } 
           }}
+          onDismiss={() => setShowEndPicker({ ...showEndPicker, visible: false })}
         />
       )}
     </View>
