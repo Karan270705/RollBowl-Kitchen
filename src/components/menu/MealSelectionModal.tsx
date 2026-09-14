@@ -41,7 +41,6 @@ export const MealSelectionModal: React.FC<MealSelectionModalProps> = ({
 
   const handleSave = () => {
     onSave(Array.from(selectedIds));
-    onClose();
   };
 
   return (

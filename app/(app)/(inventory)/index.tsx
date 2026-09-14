@@ -177,7 +177,7 @@ export default function InventoryScreen() {
           value={selectedDate}
           mode="date"
           display="default"
-          onValueChange={(date?: Date) => {
+          onValueChange={(event, date) => {
             setShowDatePicker(false);
             if (date) setSelectedDate(date);
           }}

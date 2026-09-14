@@ -63,7 +63,6 @@ export const getMenuForDate = async (stallId: string, date: string): Promise<{ s
       originalPrice: item.meals.original_price,
       category: item.meals.category,
       type: item.meals.type,
-      stallId: item.meals.stall_id,
       imageUrl: item.meals.image_url,
       isAvailable: item.meals.is_available,
       isFeatured: item.meals.is_featured,
@@ -186,11 +185,10 @@ export const removeMealFromMenu = async (scheduleId: string, mealId: string): Pr
 
 // ─── Utilities ───────────────────────────────────────────────
 
-export const getAllMeals = async (stallId: string): Promise<Meal[]> => {
+export const getAllMeals = async (): Promise<Meal[]> => {
   const { data, error } = await supabase
     .from('meals')
     .select('*')
-    .eq('stall_id', stallId)
     .order('name');
 
   if (error) throw error;
@@ -203,7 +201,6 @@ export const getAllMeals = async (stallId: string): Promise<Meal[]> => {
     originalPrice: m.original_price,
     category: m.category,
     type: m.type,
-    stallId: m.stall_id,
     imageUrl: m.image_url,
     isAvailable: m.is_available,
     isFeatured: m.is_featured,

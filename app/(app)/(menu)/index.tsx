@@ -40,10 +40,60 @@ export default function MenuScreen() {
   const { data: mealsPool = [], isLoading: poolLoading } = useMealsPool();
 
   // Mutations
-  const { mutate: saveMeals, isPending: saving } = useSaveMenuMeals(selectedDateStr);
-  const { mutate: updateMenu } = useUpdateMenuSchedule(selectedDateStr);
-  const { mutate: removeMeal } = useRemoveMealFromMenu(selectedDateStr);
-  const { mutate: copyMenuMutate, isPending: copying } = useCopyMenu(selectedDateStr);
+  const { mutate: saveMeals, isPending: saving } = useSaveMenuMeals(
+    selectedDateStr,
+    () => {
+      console.log('[Menu] Meals saved successfully');
+      setModalVisible(false);
+    },
+    (error: Error) => {
+      console.error('[Menu] Failed to save meals:', error);
+      Alert.alert(
+        'Failed to Add Items',
+        `Could not add items to menu: ${error.message}\n\nPlease try again or contact support if the issue persists.`,
+        [{ text: 'OK' }]
+      );
+    }
+  );
+  
+  const { mutate: updateMenu } = useUpdateMenuSchedule(
+    selectedDateStr,
+    undefined,
+    (error: Error) => {
+      console.error('[Menu] Failed to update menu schedule:', error);
+      Alert.alert(
+        'Failed to Update Menu',
+        `Could not update menu schedule: ${error.message}\n\nPlease try again or contact support if the issue persists.`,
+        [{ text: 'OK' }]
+      );
+    }
+  );
+  
+  const { mutate: removeMeal } = useRemoveMealFromMenu(
+    selectedDateStr,
+    undefined,
+    (error: Error) => {
+      console.error('[Menu] Failed to remove item:', error);
+      Alert.alert(
+        'Failed to Remove Item',
+        `Could not remove item: ${error.message}\n\nPlease try again or contact support if the issue persists.`,
+        [{ text: 'OK' }]
+      );
+    }
+  );
+  
+  const { mutate: copyMenuMutate, isPending: copying } = useCopyMenu(
+    selectedDateStr,
+    undefined,
+    (error: Error) => {
+      console.error('[Menu] Failed to copy menu:', error);
+      Alert.alert(
+        'Failed to Copy Menu',
+        `Could not copy menu: ${error.message}\n\nPlease try again or contact support if the issue persists.`,
+        [{ text: 'OK' }]
+      );
+    }
+  );
 
   const schedule = menuData?.schedule;
   const items = menuData?.items || [];
@@ -119,7 +169,14 @@ export default function MenuScreen() {
                 for (const m of unavailableSelected) {
                   await enableMeal(m.id);
                 }
-                saveMeals({ scheduleId: schedule?.id || null, mealIds });
+                saveMeals({ 
+                  scheduleId: schedule?.id || null, 
+                  mealIds,
+                  orderingStart: orderingStart?.toISOString(),
+                  orderingEnd: orderingEnd?.toISOString(),
+                  deliveryStart: deliveryStart?.toISOString(),
+                  deliveryEnd: deliveryEnd?.toISOString()
+                });
               } catch (e: any) {
                 Alert.alert('Error', e.message);
               }
@@ -160,7 +217,7 @@ export default function MenuScreen() {
     try {
       await enableMeal(mealId);
       Alert.alert('Success', 'Meal enabled successfully.');
-      queryClient.invalidateQueries({ queryKey: ['mealsPool'] });
+      queryClient.invalidateQueries({ queryKey: ['meals'] });
       queryClient.invalidateQueries({ queryKey: ['menu', selectedDateStr] });
     } catch (e: any) {
       Alert.alert('Error', e.message);
@@ -381,7 +438,7 @@ export default function MenuScreen() {
           value={orderingStart}
           mode={showStartPicker.mode}
           display="default"
-          onValueChange={(d?: Date) => {
+          onValueChange={(event, d) => {
             setShowStartPicker({ ...showStartPicker, visible: false });
             if (d) {
               const newDate = new Date(orderingStart);
@@ -401,7 +458,7 @@ export default function MenuScreen() {
           value={orderingEnd}
           mode={showEndPicker.mode}
           display="default"
-          onValueChange={(d?: Date) => {
+          onValueChange={(event, d) => {
             setShowEndPicker({ ...showEndPicker, visible: false });
             if (d) {
               const newDate = new Date(orderingEnd);
@@ -421,7 +478,7 @@ export default function MenuScreen() {
           value={deliveryStart}
           mode={showDeliveryStartPicker.mode}
           display="default"
-          onValueChange={(d?: Date) => {
+          onValueChange={(event, d) => {
             setShowDeliveryStartPicker({ ...showDeliveryStartPicker, visible: false });
             if (d) {
               const newDate = new Date(deliveryStart);
@@ -441,7 +498,7 @@ export default function MenuScreen() {
           value={deliveryEnd}
           mode={showDeliveryEndPicker.mode}
           display="default"
-          onValueChange={(d?: Date) => {
+          onValueChange={(event, d) => {
             setShowDeliveryEndPicker({ ...showDeliveryEndPicker, visible: false });
             if (d) {
               const newDate = new Date(deliveryEnd);

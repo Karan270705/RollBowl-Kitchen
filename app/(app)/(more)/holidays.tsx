@@ -183,7 +183,7 @@ export default function HolidaysScreen() {
                     mode="date"
                     display="default"
                     minimumDate={getKitchenDate()}
-                    onValueChange={(selectedDate) => {
+                    onValueChange={(event, selectedDate) => {
                       if (selectedDate) setDate(selectedDate);
                     }}
                   />
@@ -196,7 +196,7 @@ export default function HolidaysScreen() {
                   mode="date"
                   display="default"
                   minimumDate={getKitchenDate()}
-                  onValueChange={(selectedDate) => {
+                  onValueChange={(event, selectedDate) => {
                     setShowPicker(false);
                     if (selectedDate) setDate(selectedDate);
                   }}

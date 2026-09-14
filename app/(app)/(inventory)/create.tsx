@@ -278,7 +278,7 @@ export default function CreateBatchScreen() {
       {showStartPicker.visible && windowStart && (
         <DateTimePicker
           value={windowStart} mode={showStartPicker.mode} display="default"
-          onValueChange={(d) => { 
+          onValueChange={(event, d) => { 
             setShowStartPicker({ ...showStartPicker, visible: false }); 
             if(d) { 
               const nd = new Date(windowStart); 
@@ -296,7 +296,7 @@ export default function CreateBatchScreen() {
       {showEndPicker.visible && windowEnd && (
         <DateTimePicker
           value={windowEnd} mode={showEndPicker.mode} display="default"
-          onValueChange={(d) => { 
+          onValueChange={(event, d) => { 
             setShowEndPicker({ ...showEndPicker, visible: false }); 
             if(d) { 
               const nd = new Date(windowEnd); 
