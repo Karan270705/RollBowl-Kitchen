@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,8 +8,10 @@ import { formatDisplayDate } from '@/src/utils/helpers';
 import { useOperationalContext } from '@/src/hooks/useOperationalContext';
 import { useOperationalMenuStatus } from '@/src/hooks/useMenu';
 import { useDashboardMetrics } from '@/src/services/dashboard';
+import { useInventoryBatches } from '@/src/hooks/useInventory';
 import { EmptyState } from '@/src/components/ui';
 import { StallSelector } from '@/src/components/stall/StallSelector';
+import { WalkInSaleModal, WalkInSalesSummary } from '@/src/components/walkin';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { getDeviceId } from '@/src/utils/device';
 
@@ -17,11 +19,19 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const user = useUser();
   const router = useRouter();
+  const [showWalkInModal, setShowWalkInModal] = useState(false);
 
   const { stallId, calendarDate, resolvedOperationalDate, preparationDate, isResolving } = useOperationalContext();
 
   const { data: menuStatus } = useOperationalMenuStatus(preparationDate, isResolving);
   const { data: metrics, isPending, isLoading, error, refetch } = useDashboardMetrics(stallId, calendarDate, resolvedOperationalDate, preparationDate, isResolving);
+
+  // Derive the currently active inventory batch for walk-in sales
+  const { data: batches } = useInventoryBatches(resolvedOperationalDate ?? calendarDate);
+  const activeBatch = useMemo(
+    () => (batches ?? []).find(b => b.status === 'active') ?? null,
+    [batches],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -147,6 +157,16 @@ export default function DashboardScreen() {
               </View>
             </View>
           )}
+
+          {/* Walk-In Sales Summary — taps to open the walk-in modal */}
+          {resolvedOperationalDate && (
+            <View style={{ marginTop: Spacing.base }}>
+              <WalkInSalesSummary
+                stallId={stallId}
+                onPress={() => setShowWalkInModal(true)}
+              />
+            </View>
+          )}
         </>
       )}
     </View>
@@ -229,46 +249,59 @@ export default function DashboardScreen() {
   );
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: insets.top + Spacing.base, paddingBottom: Spacing['3xl'] },
-      ]}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={isPending} onRefresh={refetch} tintColor={Colors.primary} />}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>{greeting} {user?.name}</Text>
-          <View style={{ marginTop: 4 }}>
-            <StallSelector />
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + Spacing.base, paddingBottom: Spacing['3xl'] },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isPending} onRefresh={refetch} tintColor={Colors.primary} />}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.greeting}>{greeting} {user?.name}</Text>
+            <View style={{ marginTop: 4 }}>
+              <StallSelector />
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            <View style={styles.dateChip}>
+              <Ionicons
+                name="time-outline"
+                size={14}
+                color={Colors.brandBrown}
+              />
+              <Text style={styles.dateText}>Live Data</Text>
+            </View>
           </View>
         </View>
-        <View style={styles.headerRight}>
-          <View style={styles.dateChip}>
-            <Ionicons
-              name="time-outline"
-              size={14}
-              color={Colors.brandBrown}
-            />
-            <Text style={styles.dateText}>Live Data</Text>
-          </View>
-        </View>
-      </View>
 
-      {/* Global Status Bar is removed because it's replaced by the split domain banners */}
+        {/* Global Status Bar is removed because it's replaced by the split domain banners */}
 
-      {renderExecutionSection()}
-      
-      {/* Visual Divider */}
-      <View style={styles.divider} />
+        {renderExecutionSection()}
+        
+        {/* Visual Divider */}
+        <View style={styles.divider} />
 
-      {renderPlanningSection()}
+        {renderPlanningSection()}
 
-    </ScrollView>
+      </ScrollView>
+
+      {/* Walk-In Sale Modal */}
+      {resolvedOperationalDate && (
+        <WalkInSaleModal
+          visible={showWalkInModal}
+          onClose={() => setShowWalkInModal(false)}
+          stallId={stallId}
+          batchId={activeBatch?.id ?? null}
+        />
+      )}
+    </>
   );
+
 }
 
 function getGreeting(): string {

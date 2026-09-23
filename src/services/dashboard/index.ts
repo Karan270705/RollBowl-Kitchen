@@ -50,9 +50,7 @@ export const fetchDashboardMetrics = async (
           includeCancelled: true,
         })
       : Promise.resolve([] as Order[]),
-    operationsDate
-      ? fetchWalkInSales(stallId, operationsDate)
-      : Promise.resolve([]),
+    fetchWalkInSales(stallId, calendarDate),
     operationsDate
       ? getHolidayForDate(operationsDate, stallId)
       : Promise.resolve(null),
