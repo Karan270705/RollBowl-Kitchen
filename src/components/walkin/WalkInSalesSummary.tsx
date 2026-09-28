@@ -15,6 +15,7 @@ function formatCurrency(amount: number): string {
 
 export interface WalkInSalesSummaryProps {
   stallId: string;
+  operationalDate: string;
   onPress?: () => void;
 }
 
@@ -22,16 +23,10 @@ export interface WalkInSalesSummaryProps {
 
 export function WalkInSalesSummary({
   stallId,
+  operationalDate,
   onPress,
 }: WalkInSalesSummaryProps) {
-  // Walk-in summary always shows today's counter sales,
-  // independent of the operational/menu-cycle date.
-  const currentDate = useMemo(
-    () => new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD in local timezone
-    [],
-  );
-
-  const { data: summary, isLoading } = useWalkInSalesSummary(stallId, currentDate);
+  const { data: summary, isLoading } = useWalkInSalesSummary(stallId, operationalDate);
 
   const count   = summary?.count   ?? 0;
   const revenue = summary?.revenue ?? 0;

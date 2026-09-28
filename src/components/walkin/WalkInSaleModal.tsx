@@ -40,6 +40,7 @@ export interface WalkInSaleModalProps {
   onClose: () => void;
   stallId: string;
   batchId: string | null;
+  operationalDate: string;
 }
 
 // ─── Component ───────────────────────────────────────────────
@@ -49,22 +50,16 @@ export function WalkInSaleModal({
   onClose,
   stallId,
   batchId,
+  operationalDate,
 }: WalkInSaleModalProps) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [notes, setNotes] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Walk-in sales always use the current calendar date (today at the counter),
-  // not the operational/menu-cycle date which may be tomorrow.
-  const currentDate = useMemo(
-    () => new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD in local timezone
-    [],
-  );
-
   const { data: availableItems = [], isLoading } = useAvailableWalkInItems(
     stallId,
-    currentDate,
+    operationalDate,
     batchId,
   );
 
@@ -151,7 +146,7 @@ export function WalkInSaleModal({
     try {
       const result = await createOrderMutation.mutateAsync({
         stallId,
-        serviceDate: currentDate,
+        serviceDate: operationalDate,
         batchId,
         items: cart.map(item => ({
           meal_id: item.meal_id,

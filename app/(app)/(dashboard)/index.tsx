@@ -163,6 +163,7 @@ export default function DashboardScreen() {
             <View style={{ marginTop: Spacing.base }}>
               <WalkInSalesSummary
                 stallId={stallId}
+                operationalDate={resolvedOperationalDate}
                 onPress={() => setShowWalkInModal(true)}
               />
             </View>
@@ -297,6 +298,7 @@ export default function DashboardScreen() {
           onClose={() => setShowWalkInModal(false)}
           stallId={stallId}
           batchId={activeBatch?.id ?? null}
+          operationalDate={resolvedOperationalDate}
         />
       )}
     </>
